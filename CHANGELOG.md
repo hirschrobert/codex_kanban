@@ -12,6 +12,10 @@ history does not retain personal author metadata, local machine paths, local
 tool refs, or private infrastructure references. Local-only working commits
 from before that cleanup are intentionally not part of the public history.
 
+Public commit:
+
+- `a675f6c` imports the sanitized 0.1.1 public tree.
+
 Changes:
 
 - Added AGPLv3-only licensing and package metadata.
