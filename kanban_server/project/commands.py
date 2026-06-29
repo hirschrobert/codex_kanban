@@ -1,0 +1,206 @@
+from __future__ import annotations
+
+import argparse
+import json
+import urllib.parse
+from pathlib import Path
+from typing import Any
+
+from ..store.core import KanbanStore
+from ..store.support import slugify
+from .api import _patch_json, _post_json, _print_json, _request_json
+from .due import due_run as due_run
+from .payloads import (
+    _agent_profiles,
+    _card_payload,
+    _card_update_payload,
+    _participant_payload,
+    _registration_payload,
+    _workflow_payload,
+)
+
+CODEX_KANBAN_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def register(args: argparse.Namespace) -> int:
+    payload = _registration_payload(args)
+    if args.server_url:
+        result = _post_json(args.server_url, "/api/projects", payload)
+        if result is not None:
+            _print_json(result)
+            return 0
+
+    store = KanbanStore(args.db)
+    result = store.register_project(payload)
+    _print_json(result)
+    return 0
+
+
+def list_projects(args: argparse.Namespace) -> int:
+    if args.server_url:
+        result = _request_json(args.server_url, "/api/projects")
+        if result is not None:
+            _print_json({"projects": result["all_projects" if args.all else "projects"]})
+            return 0
+
+    store = KanbanStore(args.db)
+    _print_json({"projects": store.list_projects(include_removed=args.all)})
+    return 0
+
+
+def snapshot(args: argparse.Namespace) -> int:
+    path = "/api/snapshot"
+    if args.board:
+        path += "?" + urllib.parse.urlencode({"board": args.board})
+    if args.server_url:
+        result = _request_json(args.server_url, path)
+        if result is not None:
+            _print_json(result)
+            return 0
+
+    store = KanbanStore(args.db)
+    _print_json(store.snapshot(args.board or None))
+    return 0
+
+
+def card_create(args: argparse.Namespace) -> int:
+    payload = _card_payload(args)
+    if args.server_url:
+        result = _post_json(args.server_url, "/api/cards", payload)
+        if result is not None:
+            _print_json(result)
+            return 0
+
+    store = KanbanStore(args.db)
+    card = store.create_card(payload)
+    store.create_event(
+        {
+            "board_slug": card["board_slug"],
+            "event_type": "card.created",
+            "card_id": card["id"],
+            "participant_id": args.actor_id,
+            "message": card["title"],
+            "metadata": {"status": card["status"]},
+        }
+    )
+    _print_json(card)
+    return 0
+
+
+def card_move(args: argparse.Namespace) -> int:
+    payload = _card_update_payload(args)
+    if args.server_url:
+        result = _patch_json(args.server_url, f"/api/cards/{args.card_id}", payload)
+        if result is not None:
+            _print_json(result)
+            return 0
+
+    store = KanbanStore(args.db)
+    before = store.get_card(args.card_id)
+    card = store.update_card(args.card_id, payload)
+    event_type = "card.updated"
+    message = card["title"]
+    metadata: dict[str, Any] = {}
+    if before and before.get("status") != card.get("status"):
+        event_type = "card.moved"
+        message = f"{before.get('status')} -> {card.get('status')}"
+        metadata = {"from_status": before.get("status"), "to_status": card.get("status")}
+    store.create_event(
+        {
+            "board_slug": card["board_slug"],
+            "event_type": event_type,
+            "card_id": card["id"],
+            "message": message,
+            "metadata": metadata,
+        }
+    )
+    _print_json(card)
+    return 0
+
+
+def participant_upsert(args: argparse.Namespace) -> int:
+    payload = _participant_payload(args)
+    if args.server_url:
+        result = _post_json(args.server_url, "/api/participants", payload)
+        if result is not None:
+            _print_json(result)
+            return 0
+
+    store = KanbanStore(args.db)
+    participant = store.upsert_participant(payload)
+    store.create_event(
+        {
+            "board_slug": participant.get("current_board_slug") or store.default_board_slug(),
+            "event_type": "participant.updated",
+            "participant_id": participant["id"],
+            "message": participant["display_name"],
+            "metadata": {"kind": participant["kind"], "status": participant["status"]},
+        }
+    )
+    _print_json(participant)
+    return 0
+
+
+def workflow_start(args: argparse.Namespace) -> int:
+    payload = _workflow_payload(args)
+    if args.server_url:
+        result = _post_json(args.server_url, "/api/workflows/start", payload)
+        if result is not None:
+            _print_json(result)
+            return 0
+
+    store = KanbanStore(args.db)
+    result = store.start_workflow(payload)
+    if result.get("created"):
+        card = result["card"]
+        store.create_event(
+            {
+                "board_slug": card["board_slug"],
+                "event_type": "workflow.started",
+                "card_id": card["id"],
+                "participant_id": args.actor_id,
+                "message": card["title"],
+                "metadata": {
+                    "workflow_key": payload["workflow_key"],
+                    "scheduled_for": payload.get("scheduled_for") or "",
+                },
+            }
+        )
+    _print_json(result)
+    return 0
+
+
+def reset(args: argparse.Namespace) -> int:
+    if not args.yes:
+        raise SystemExit("Refusing to reset the Kanban database without --yes.")
+    store = KanbanStore(args.db)
+    store.reset()
+    _print_json({"reset": True, "db": str(store.db_path)})
+    return 0
+
+
+def print_prompt(args: argparse.Namespace) -> int:
+    root = Path(args.root).expanduser().resolve()
+    display_name = args.display_name or root.name
+    slug = slugify(args.slug or display_name)
+    card_prefix = (args.card_prefix or slug.split("-")[0]).upper()
+    profiles = ", ".join(_agent_profiles(args, root=root))
+    print(f"""Register this project with Codex Kanban before doing implementation work.
+
+Run from a trusted shell:
+
+PYTHONPATH={CODEX_KANBAN_REPO_ROOT} python3 -m kanban_server.project register \\
+  --server-url http://127.0.0.1:8766 \\
+  --root {root} \\
+  --slug {slug} \\
+  --display-name {json.dumps(display_name)} \\
+  --card-prefix {card_prefix}
+
+After registration, use board `{slug}` as the shared orchestration surface.
+Use the `codex-kanban` skill to respect human-added cards, work only on the
+assigned card/scope, and delegate to the reusable agent profiles: {profiles}.
+
+Concrete project rules stay in this repo's AGENTS.md; do not copy domain rules
+into the global Kanban app.
+""")
+    return 0

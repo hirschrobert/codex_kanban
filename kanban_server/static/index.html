@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Codex Kanban</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/cards.css">
+    <link rel="stylesheet" href="/static/sidebar.css">
+    <link rel="stylesheet" href="/static/dialogs.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Project Coordination</p>
+          <h1>Codex Kanban</h1>
+        </div>
+        <div class="topbar-actions">
+          <label class="project-picker">
+            <span>Project</span>
+            <select id="project-select"></select>
+          </label>
+          <label class="toggle-field">
+            <input id="show-archived-toggle" type="checkbox">
+            <span>Archived</span>
+          </label>
+          <button id="archive-action-button" class="ghost-button" type="button" disabled>Archive</button>
+          <span id="live-state" class="live-pill">Connecting</span>
+          <button id="settings-button" class="ghost-button" type="button">Settings</button>
+          <button id="new-card-button" class="primary-button" type="button">New Card</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="board-region" aria-label="Kanban board">
+          <div id="board" class="board"></div>
+        </section>
+
+        <aside class="side-rail" aria-label="Presence and activity">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>People</h2>
+              <button id="new-participant-button" class="ghost-button" type="button">Add</button>
+            </div>
+            <div id="participants" class="participant-list"></div>
+          </section>
+
+          <section class="panel activity-panel">
+            <div class="panel-header">
+              <h2>Activity</h2>
+            </div>
+            <ol id="activity" class="activity-list"></ol>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <dialog id="card-dialog" class="dialog">
+      <form id="card-form" method="dialog" class="dialog-form">
+        <div class="dialog-header">
+          <h2 id="card-dialog-title">New Card</h2>
+          <button class="icon-button dialog-cancel" type="button">X</button>
+        </div>
+        <input type="hidden" name="id">
+        <label>
+          <span>Title</span>
+          <input name="title" required maxlength="180" autocomplete="off">
+        </label>
+        <label>
+          <span>Description</span>
+          <textarea name="description" rows="6" required placeholder="Request or observed problem.
+
+Why this card exists:
+Explain the coordination, correctness, release, or maintenance reason.
+
+If this is not fixed:
+- Concrete example of what could go wrong.
+
+Acceptance criteria:
+- Observable condition for done or handoff."></textarea>
+        </label>
+        <div class="form-grid">
+          <label>
+            <span>Status</span>
+            <select name="status"></select>
+          </label>
+          <label>
+            <span>Priority</span>
+            <select name="priority">
+              <option value="low">Low</option>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </label>
+          <label>
+            <span>Owner</span>
+            <select name="owner_id"></select>
+          </label>
+          <label>
+            <span>Assignee</span>
+            <select name="assignee_id"></select>
+          </label>
+          <label>
+            <span>Repeat</span>
+            <select name="repeat_cadence">
+              <option value="none">None</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </label>
+          <label>
+            <span>Repeat Time</span>
+            <input name="repeat_time" type="time" value="01:00" step="60">
+          </label>
+          <label>
+            <span>Parents</span>
+            <textarea name="parent_external_ids" rows="2" placeholder="cards that depend on this card, one per line"></textarea>
+          </label>
+          <label>
+            <span>Children</span>
+            <textarea name="child_external_ids" rows="2" placeholder="prerequisite cards, one per line"></textarea>
+          </label>
+          <label>
+            <span>Target Branch</span>
+            <input name="target_branch" autocomplete="off" placeholder="current or next release branch, never main">
+          </label>
+          <label>
+            <span>Target Repo</span>
+            <input name="target_repo" autocomplete="off" placeholder="repo name or /workspace/project">
+          </label>
+          <label>
+            <span>Feature Branch</span>
+            <input name="feature_branch" autocomplete="off" placeholder="feature/CARD-ID-short-title">
+          </label>
+          <label>
+            <span>Worktree Path</span>
+            <input name="worktree_path" autocomplete="off" placeholder="/path/to/worktree/project-card">
+          </label>
+          <label>
+            <span>Start SHA</span>
+            <input name="starting_target_sha" autocomplete="off" placeholder="target branch SHA before work">
+          </label>
+          <label>
+            <span>Handoff SHA</span>
+            <input name="handoff_target_sha" autocomplete="off" placeholder="target branch SHA after refresh">
+          </label>
+        </div>
+        <label>
+          <span>Blocker</span>
+          <textarea name="blocker_reason" rows="2" placeholder="decision, access, conflict, or dependency needed"></textarea>
+        </label>
+        <label>
+          <span>Checks</span>
+          <textarea name="checks" rows="3" placeholder="one per line, e.g. pytest tests/test_store.py"></textarea>
+        </label>
+        <label class="checkbox-field">
+          <input name="archived" type="checkbox">
+          <span>Archived</span>
+        </label>
+        <section id="card-comments-section" class="comments-section">
+          <div class="section-header">
+            <h3>Notes</h3>
+          </div>
+          <ol id="card-comments" class="comment-list"></ol>
+          <div class="comment-compose">
+            <select name="comment_writer" aria-label="Note writer"></select>
+            <textarea name="comment_body" rows="2" placeholder="Add a note"></textarea>
+            <button id="add-comment-button" class="ghost-button" type="button">Add</button>
+          </div>
+        </section>
+        <div class="dialog-actions">
+          <button id="run-card-now-button" class="ghost-button" type="button">Run Now</button>
+          <button id="delete-card-button" class="ghost-button danger-button" type="button">Delete</button>
+          <button class="ghost-button dialog-cancel" type="button">Cancel</button>
+          <button class="primary-button" value="default" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="participant-dialog" class="dialog small-dialog">
+      <form id="participant-form" method="dialog" class="dialog-form">
+        <div class="dialog-header">
+          <h2>Participant</h2>
+          <button class="icon-button dialog-cancel" type="button">X</button>
+        </div>
+        <input type="hidden" name="id">
+        <label>
+          <span>Name</span>
+          <input name="display_name" required autocomplete="off">
+        </label>
+        <div class="form-grid">
+          <label>
+            <span>Status</span>
+            <select name="status">
+              <option value="idle">Idle</option>
+              <option value="running">Running</option>
+              <option value="waiting">Waiting</option>
+              <option value="waiting_approval">Waiting Approval</option>
+              <option value="blocked">Blocked</option>
+              <option value="reviewing">Reviewing</option>
+              <option value="done">Done</option>
+              <option value="offline">Offline</option>
+            </select>
+          </label>
+        </div>
+        <div class="dialog-actions">
+          <button class="ghost-button dialog-cancel" type="button">Cancel</button>
+          <button class="primary-button" value="default" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="settings-dialog" class="dialog settings-dialog">
+      <div class="dialog-form">
+        <div class="dialog-header">
+          <h2>Settings</h2>
+          <button class="icon-button settings-close" type="button">X</button>
+        </div>
+        <div id="settings-agent-limits" class="settings-limit-panel"></div>
+        <div id="settings-project-list" class="settings-project-list"></div>
+        <div class="dialog-actions">
+          <button class="ghost-button settings-close" type="button">Close</button>
+        </div>
+      </div>
+    </dialog>
+
+    <script src="/static/app_state.js"></script>
+    <script src="/static/app_api.js"></script>
+    <script src="/static/app_model.js"></script>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

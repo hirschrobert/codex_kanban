@@ -1,0 +1,314 @@
+from __future__ import annotations
+
+import json
+import os
+import re
+import tomllib
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+_DEFAULT_HOME = os.environ.get("CODEX_KANBAN_HOME")
+DEFAULT_HOME = (
+    Path(_DEFAULT_HOME).expanduser() if _DEFAULT_HOME else Path.home() / ".codex" / "codex-kanban"
+)
+DEFAULT_DB_PATH = Path(os.environ.get("CODEX_KANBAN_DB", DEFAULT_HOME / "kanban.sqlite3"))
+
+LANES = (
+    {"status": "backlog", "title": "Backlog", "position": 10},
+    {"status": "ready", "title": "Ready", "position": 20},
+    {"status": "in_progress", "title": "In Progress", "position": 30},
+    {"status": "review", "title": "Review", "position": 40},
+    {"status": "blocked", "title": "Blocked", "position": 50},
+    {"status": "done", "title": "Done", "position": 60},
+)
+
+LANE_STATUSES = {lane["status"] for lane in LANES}
+ACTIVE_CONFLICT_STATUSES = {"in_progress", "blocked"}
+ACTIVE_CARD_STATUSES = {"in_progress", "review"}
+ACTIVE_PARTICIPANT_STATUSES = {"running", "reviewing"}
+DEPENDENCY_ADVANCEMENT_STATUSES = {"in_progress", "review", "done"}
+DEPENDENCY_RESOLVED_STATUSES = {"done"}
+REPEAT_CADENCES = {"none", "daily", "weekly", "monthly"}
+DEFAULT_REPEAT_TIME = "01:00"
+DEFAULT_REPEAT_TIMEZONE = "Europe/Berlin"
+STALE_AFTER_SECONDS = int(os.environ.get("CODEX_KANBAN_STALE_AFTER_SECONDS", "300"))
+MAX_ACTIVE_AGENTS_PER_PROJECT = int(
+    os.environ.get("CODEX_KANBAN_MAX_ACTIVE_AGENTS_PER_PROJECT", "4")
+)
+MAX_ACTIVE_IMPLEMENTERS_PER_PROJECT = int(
+    os.environ.get("CODEX_KANBAN_MAX_ACTIVE_IMPLEMENTERS_PER_PROJECT", "1")
+)
+MAX_ACTIVE_AGENTS_GLOBAL = int(os.environ.get("CODEX_KANBAN_MAX_ACTIVE_AGENTS_GLOBAL", "0"))
+PRIORITIES = {"low", "normal", "high", "urgent"}
+PARTICIPANT_KINDS = {"agent", "human", "system"}
+LOCAL_COMMENT_AUTHOR_NAME = "local developer"
+LEGACY_LOCAL_COMMENT_AUTHOR_NAMES = {"local human"}
+PARTICIPANT_STATUSES = {
+    "idle",
+    "running",
+    "waiting",
+    "waiting_approval",
+    "blocked",
+    "reviewing",
+    "done",
+    "offline",
+}
+
+JSON_LIST_FIELDS = {
+    "files_changed",
+    "checks",
+    "assumptions",
+    "follow_up_cards",
+}
+
+PROJECT_JSON_FIELDS = {
+    "paths",
+    "instruction_paths",
+    "agent_profiles",
+}
+
+GENERIC_AGENT_PROFILES = {
+    "kanban_auditor": "Read-only board/card, handoff, stale-state, and release-containment audit.",
+    "domain_model_steward": (
+        "Read-only terminology, ubiquitous-language, and data-model impact review."
+    ),
+    "architecture_impact_analyst": (
+        "Read-only blast-radius, boundary, and architectural impact analysis."
+    ),
+    "api_contract_steward": "Read-only OpenAPI, AsyncAPI, schema, and contract-first review.",
+    "project_architect": "Read-only architecture, contracts, release-train, and risk analysis.",
+    "project_implementer": "Bounded implementation worker with scoped file ownership.",
+    "project_reviewer": "Read-only correctness, regression, security, and test review.",
+    "project_release_manager": "Read-only release, CI/CD, packaging, and deploy-readiness review.",
+    "test_strategist": "Read-only test strategy, coverage, and verification planning.",
+}
+
+AGENT_PROFILE_FILE_SUFFIXES = {".toml", ".json", ".md", ".txt"}
+
+CARD_TEXT_FIELDS = {
+    "external_id",
+    "title",
+    "description",
+    "status",
+    "assignee_id",
+    "owner_id",
+    "priority",
+    "target_repo",
+    "target_branch",
+    "starting_target_sha",
+    "handoff_target_sha",
+    "feature_branch",
+    "worktree_path",
+    "blocker_reason",
+    "repeat_cadence",
+    "repeat_time",
+    "repeat_timezone",
+}
+
+
+def utc_now() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _utc_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def slugify(value: str) -> str:
+    value = value.strip().lower()
+    value = re.sub(r"[^a-z0-9]+", "-", value)
+    return value.strip("-") or "item"
+
+
+def agent_profile_id(value: Any) -> str:
+    if isinstance(value, dict):
+        value = (
+            value.get("name")
+            or value.get("id")
+            or value.get("display_name")
+            or value.get("profile")
+        )
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return slugify(text).replace("-", "_")
+
+
+def merge_agent_profiles(*groups: Any) -> list[str]:
+    profiles: list[str] = []
+    seen: set[str] = set()
+    for group in groups:
+        for item in _normalise_list(group):
+            profile = agent_profile_id(item)
+            if not profile or profile in seen:
+                continue
+            seen.add(profile)
+            profiles.append(profile)
+    return profiles
+
+
+def discover_project_agent_profiles(
+    root_path: str | Path | None,
+    paths: list[Any] | None = None,
+) -> list[str]:
+    candidates: list[Any] = []
+    if root_path:
+        candidates.append(root_path)
+    candidates.extend(paths or [])
+
+    profiles: list[str] = []
+    seen_dirs: set[Path] = set()
+    for candidate in candidates:
+        raw_path = candidate.get("path") if isinstance(candidate, dict) else candidate
+        if not raw_path:
+            continue
+        try:
+            agent_dir = Path(str(raw_path)).expanduser().resolve() / ".codex" / "agents"
+        except (OSError, RuntimeError):
+            continue
+        if agent_dir in seen_dirs or not agent_dir.is_dir():
+            continue
+        seen_dirs.add(agent_dir)
+        for path in sorted(agent_dir.iterdir()):
+            if not path.is_file() or path.name.startswith("."):
+                continue
+            if path.stem.lower() in {"readme", "agents"}:
+                continue
+            if path.suffix.lower() not in AGENT_PROFILE_FILE_SUFFIXES:
+                continue
+            profile = _profile_from_agent_file(path)
+            if profile:
+                profiles.append(profile)
+    return merge_agent_profiles(profiles)
+
+
+def _profile_from_agent_file(path: Path) -> str:
+    raw_name: Any = path.stem
+    if path.suffix.lower() == ".toml":
+        try:
+            data = tomllib.loads(path.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError):
+            data = {}
+        if isinstance(data, dict):
+            raw_name = data.get("name") or data.get("id") or data.get("display_name") or raw_name
+    elif path.suffix.lower() == ".json":
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        if isinstance(data, dict):
+            raw_name = data.get("name") or data.get("id") or data.get("display_name") or raw_name
+    return agent_profile_id(raw_name)
+
+
+def _json_dumps(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=True, separators=(",", ":"))
+
+
+def _json_loads(value: str | None, default: Any) -> Any:
+    if not value:
+        return default
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return default
+
+
+def _normalise_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return []
+        if value.startswith("["):
+            parsed = _json_loads(value, [])
+            return parsed if isinstance(parsed, list) else []
+        return [part.strip() for part in re.split(r"[\n,]+", value) if part.strip()]
+    return [value]
+
+
+def _normalise_metadata(value: Any) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return {}
+        parsed = _json_loads(value, {})
+        return parsed if isinstance(parsed, dict) else {"text": value}
+    return {"value": value}
+
+
+def _normalise_text_newlines(text: str) -> str:
+    return (
+        text.replace("\\r\\n", "\n")
+        .replace("\\n", "\n")
+        .replace("\\r", "\n")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+    )
+
+
+def _normalise_comment_author_name(value: str | None) -> str | None:
+    if not value:
+        return None
+    cleaned = value.strip()
+    if cleaned.lower() in LEGACY_LOCAL_COMMENT_AUTHOR_NAMES:
+        return LOCAL_COMMENT_AUTHOR_NAME
+    return cleaned or None
+
+
+__all__ = [
+    "DEFAULT_HOME",
+    "DEFAULT_DB_PATH",
+    "LANES",
+    "LANE_STATUSES",
+    "ACTIVE_CONFLICT_STATUSES",
+    "ACTIVE_CARD_STATUSES",
+    "ACTIVE_PARTICIPANT_STATUSES",
+    "DEPENDENCY_ADVANCEMENT_STATUSES",
+    "DEPENDENCY_RESOLVED_STATUSES",
+    "REPEAT_CADENCES",
+    "DEFAULT_REPEAT_TIME",
+    "DEFAULT_REPEAT_TIMEZONE",
+    "STALE_AFTER_SECONDS",
+    "MAX_ACTIVE_AGENTS_PER_PROJECT",
+    "MAX_ACTIVE_IMPLEMENTERS_PER_PROJECT",
+    "MAX_ACTIVE_AGENTS_GLOBAL",
+    "PRIORITIES",
+    "PARTICIPANT_KINDS",
+    "LOCAL_COMMENT_AUTHOR_NAME",
+    "LEGACY_LOCAL_COMMENT_AUTHOR_NAMES",
+    "PARTICIPANT_STATUSES",
+    "JSON_LIST_FIELDS",
+    "PROJECT_JSON_FIELDS",
+    "GENERIC_AGENT_PROFILES",
+    "AGENT_PROFILE_FILE_SUFFIXES",
+    "CARD_TEXT_FIELDS",
+    "utc_now",
+    "_utc_datetime",
+    "slugify",
+    "agent_profile_id",
+    "merge_agent_profiles",
+    "discover_project_agent_profiles",
+    "_profile_from_agent_file",
+    "_json_dumps",
+    "_json_loads",
+    "_normalise_list",
+    "_normalise_metadata",
+    "_normalise_text_newlines",
+    "_normalise_comment_author_name",
+]

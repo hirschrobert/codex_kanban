@@ -1,0 +1,111 @@
+.side-rail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-panel);
+  padding: 12px;
+}
+
+.activity-panel {
+  min-height: 280px;
+  flex: 1;
+}
+
+.participant-list,
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.participant-list {
+  max-height: 360px;
+}
+
+.activity-list {
+  max-height: calc(100vh - 260px);
+}
+
+.participant-row,
+.activity-row {
+  min-height: 46px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.activity-row {
+  align-items: flex-start;
+  list-style: none;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.status-running,
+.status-reviewing {
+  background: var(--green);
+}
+
+.status-blocked,
+.status-waiting_approval {
+  background: var(--rose);
+}
+
+.status-waiting {
+  background: var(--amber);
+}
+
+.status-stale {
+  background: var(--amber);
+}
+
+.status-done {
+  background: var(--teal);
+}
+
+.participant-row.stale {
+  border-color: var(--priority-high-bg);
+}
+
+.participant-main,
+.activity-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.participant-name,
+.activity-message {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.participant-role,
+.activity-meta {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.activity-message {
+  white-space: pre-line;
+}

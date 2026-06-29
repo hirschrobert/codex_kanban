@@ -1,0 +1,218 @@
+.kanban-card {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--teal);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 10px;
+  text-align: left;
+}
+
+.kanban-card:focus-within {
+  outline: 3px solid rgba(15, 118, 110, 0.28);
+  outline-offset: 2px;
+}
+
+.kanban-card.dragging {
+  opacity: 0.56;
+}
+
+.card-topline,
+.card-meta,
+.participant-row,
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-topline {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-open,
+.card-body-button {
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.card-body-button {
+  display: block;
+  width: 100%;
+}
+
+.archive-card-toggle {
+  flex-direction: row;
+  align-items: center;
+  width: auto;
+  min-width: 24px;
+  color: var(--muted);
+}
+
+.archive-card-toggle input {
+  width: 16px;
+  height: 16px;
+}
+
+.mini-button {
+  min-height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--text);
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.card-id,
+.chip {
+  overflow: hidden;
+  max-width: 100%;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.priority-urgent {
+  background: var(--priority-urgent-bg);
+  color: var(--priority-urgent-text);
+}
+
+.priority-high {
+  background: var(--priority-high-bg);
+  color: var(--priority-high-text);
+}
+
+.stale-chip {
+  background: var(--priority-high-bg);
+  color: var(--priority-high-text);
+}
+
+.archived-chip {
+  background: var(--line);
+  color: var(--muted);
+}
+
+.card-title {
+  margin: 0 0 8px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.card-description {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.card-meta {
+  flex-wrap: wrap;
+}
+
+.conflict {
+  border-left-color: var(--amber);
+}
+
+.kanban-card.stale {
+  border-left-color: var(--amber);
+}
+
+.blocker {
+  border-left-color: var(--rose);
+}
+
+.archived-card {
+  opacity: 0.68;
+  border-left-color: var(--muted);
+}
+
+.card-warning {
+  margin: 0 0 10px;
+  border: 1px solid var(--priority-high-bg);
+  border-radius: 8px;
+  background: var(--priority-high-bg);
+  color: var(--priority-high-text);
+  padding: 7px 8px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.comments-section {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.section-header h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.comment-list {
+  display: flex;
+  max-height: 180px;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 0;
+  overflow-y: auto;
+}
+
+.comment-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 8px;
+  list-style: none;
+}
+
+.comment-row.empty {
+  color: var(--muted);
+}
+
+.comment-body {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.comment-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.comment-compose {
+  display: grid;
+  grid-template-columns: minmax(130px, 180px) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}

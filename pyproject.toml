@@ -1,0 +1,38 @@
+[project]
+name = "codex-kanban"
+version = "0.1.1"
+description = "Codex-native realtime Kanban dashboard for human and AI coordination."
+requires-python = ">=3.11"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
+dependencies = []
+
+[project.scripts]
+codex-kanban = "kanban_server.server:main"
+codex-kanban-project = "kanban_server.project:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pyright]
+include = ["kanban_server", "tests"]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
+
+[dependency-groups]
+dev = [
+    "black>=26.5.1",
+    "pyright>=1.1.411",
+    "ruff>=0.15.20",
+]
