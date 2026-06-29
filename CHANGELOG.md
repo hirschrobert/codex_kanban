@@ -29,6 +29,8 @@ Changes:
 - Fixed dashboard startup, frontend script scope collisions, board migration,
   snapshot scaling, card ownership display, and chronological card ordering.
 - Rewrote the unpublished release history into a sanitized public branch.
+- `b4c5fcb` updated GitHub Actions dependencies to Node 24-compatible releases
+  so CI runs without the Node.js 20 deprecation warning.
 
 AI disclosure:
 
