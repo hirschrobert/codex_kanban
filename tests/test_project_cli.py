@@ -83,6 +83,33 @@ class ProjectCliTest(unittest.TestCase):
         )
         self.assertEqual(card["checks"], ["python3 -m unittest discover -s tests"])
 
+    def test_card_create_defaults_to_ai_agent_manager_actor(self) -> None:
+        db_path = self.make_db_path()
+        output = io.StringIO()
+
+        with contextlib.redirect_stdout(output):
+            exit_code = project.main(
+                [
+                    "card-create",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--title",
+                    "Coordinate follow-up",
+                    "--description",
+                    "The main AI agent is creating a coordination card.",
+                ]
+            )
+
+        card = json.loads(output.getvalue())
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(card["owner_id"], "demo-ai-agent-manager")
+        self.assertEqual(card["created_by_id"], "demo-ai-agent-manager")
+        self.assertEqual(card["created_by_name"], "AI Agent Manager")
+        self.assertEqual(card["created_by_kind"], "agent")
+
     def test_card_create_reports_bad_assignee_without_traceback(self) -> None:
         db_path = self.make_db_path()
 
@@ -183,6 +210,78 @@ class ProjectCliTest(unittest.TestCase):
             "/workspace/worktrees/demo-dm-0001",
         )
         self.assertEqual(moved["starting_target_sha"], "abc123")
+
+    def test_card_move_can_clear_blocker_reason(self) -> None:
+        db_path = self.make_db_path()
+        created_output = io.StringIO()
+        cleared_output = io.StringIO()
+        reblocked_output = io.StringIO()
+        empty_blocker_output = io.StringIO()
+
+        with contextlib.redirect_stdout(created_output):
+            project.main(
+                [
+                    "card-create",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--title",
+                    "Blocked work",
+                    "--description",
+                    "This card starts with a blocker.",
+                    "--status",
+                    "blocked",
+                    "--blocker",
+                    "Waiting on a missing dependency.",
+                ]
+            )
+        blocked = json.loads(created_output.getvalue())
+
+        with contextlib.redirect_stdout(cleared_output):
+            project.main(
+                [
+                    "card-move",
+                    "--db",
+                    str(db_path),
+                    str(blocked["id"]),
+                    "--status",
+                    "done",
+                    "--clear-blocker",
+                ]
+            )
+        cleared = json.loads(cleared_output.getvalue())
+
+        with contextlib.redirect_stdout(reblocked_output):
+            project.main(
+                [
+                    "card-move",
+                    "--db",
+                    str(db_path),
+                    str(blocked["id"]),
+                    "--status",
+                    "blocked",
+                    "--blocker",
+                    "Waiting on a missing dependency.",
+                ]
+            )
+        with contextlib.redirect_stdout(empty_blocker_output):
+            project.main(
+                [
+                    "card-move",
+                    "--db",
+                    str(db_path),
+                    str(blocked["id"]),
+                    "--status",
+                    "done",
+                    "--blocker",
+                    "",
+                ]
+            )
+        cleared_with_empty_blocker = json.loads(empty_blocker_output.getvalue())
+
+        self.assertIsNone(cleared["blocker_reason"])
+        self.assertIsNone(cleared_with_empty_blocker["blocker_reason"])
 
     def test_card_create_records_parent_and_child_links(self) -> None:
         db_path = self.make_db_path()

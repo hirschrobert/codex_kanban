@@ -116,6 +116,11 @@ def main(argv: list[str] | None = None) -> int:
     card_move_parser.add_argument("--parent")
     card_move_parser.add_argument("--child", action="append", default=[])
     _add_card_handoff_arguments(card_move_parser)
+    card_move_parser.add_argument(
+        "--clear-blocker",
+        action="store_true",
+        help="Clear an existing blocker reason while moving or handing off a card.",
+    )
     card_move_parser.set_defaults(func=card_move)
 
     workflow_parser = subparsers.add_parser(

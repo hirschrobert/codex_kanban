@@ -12,6 +12,10 @@ from ..store.support import (
 )
 from .git_ops import _current_git_branch
 
+DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME = "AI Agent Manager"
+DEFAULT_AI_AGENT_MANAGER_ROLE = "Main AI agent coordinating Kanban cards through the CLI."
+DEFAULT_AI_AGENT_MANAGER_SUFFIX = "ai-agent-manager"
+
 
 def _default_instruction_paths(root: Path) -> list[str]:
     return [str(path) for path in [root / "AGENTS.md"] if path.exists()]
@@ -84,7 +88,30 @@ def _bullet_line(value: str) -> str:
     return text if text.startswith(("- ", "* ")) else f"- {text}"
 
 
+def _default_ai_agent_manager_id(board_slug: str) -> str:
+    return f"{slugify(board_slug)}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}"
+
+
+def _default_ai_agent_manager_payload_for_args(
+    args: argparse.Namespace,
+) -> dict[str, str] | None:
+    if args.actor_id or not args.board:
+        return None
+    board_slug = slugify(args.board)
+    return {
+        "id": _default_ai_agent_manager_id(board_slug),
+        "display_name": DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME,
+        "kind": "agent",
+        "status": "idle",
+        "role": DEFAULT_AI_AGENT_MANAGER_ROLE,
+        "board_slug": board_slug,
+    }
+
+
 def _card_payload(args: argparse.Namespace) -> dict[str, Any]:
+    actor_id = args.actor_id
+    if not actor_id and args.board:
+        actor_id = _default_ai_agent_manager_id(args.board)
     payload = {
         "board_slug": args.board,
         "title": args.title,
@@ -97,8 +124,8 @@ def _card_payload(args: argparse.Namespace) -> dict[str, Any]:
         "status": args.status,
         "priority": args.priority,
         "assignee_id": args.assignee,
-        "owner_id": args.owner or args.actor_id,
-        "actor_id": args.actor_id,
+        "owner_id": args.owner or actor_id,
+        "actor_id": actor_id,
         "target_repo": args.target_repo,
         "target_branch": args.target_branch,
         "starting_target_sha": args.start_sha,
@@ -117,6 +144,11 @@ def _card_payload(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _card_update_payload(args: argparse.Namespace) -> dict[str, Any]:
+    blocker_reason = args.blocker
+    if getattr(args, "clear_blocker", False):
+        if blocker_reason not in (None, ""):
+            raise ValueError("--clear-blocker cannot be combined with a non-empty --blocker")
+        blocker_reason = ""
     payload = {
         "status": args.status,
         "owner_id": args.owner,
@@ -127,7 +159,7 @@ def _card_update_payload(args: argparse.Namespace) -> dict[str, Any]:
         "handoff_target_sha": args.handoff_sha,
         "feature_branch": args.feature_branch,
         "worktree_path": args.worktree_path,
-        "blocker_reason": args.blocker,
+        "blocker_reason": blocker_reason,
         "parent_external_id": args.parent,
         "child_external_ids": args.child or None,
         "checks": args.check or None,
@@ -135,7 +167,10 @@ def _card_update_payload(args: argparse.Namespace) -> dict[str, Any]:
         "assumptions": args.assumption or None,
         "follow_up_cards": args.follow_up or None,
     }
-    return {key: value for key, value in payload.items() if value not in (None, [], "")}
+    update = {key: value for key, value in payload.items() if value not in (None, [], "")}
+    if getattr(args, "clear_blocker", False) or args.blocker is not None:
+        update["blocker_reason"] = blocker_reason or ""
+    return update
 
 
 def _participant_payload(args: argparse.Namespace) -> dict[str, Any]:

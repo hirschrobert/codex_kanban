@@ -277,6 +277,12 @@ python3 -m kanban_server.project card-create \
   --check "python3 -m unittest discover -s tests"
 ```
 
+When `card-create` includes `--board` and no explicit `--actor-id`, the CLI
+creates or reuses `<board>-ai-agent-manager` and records that agent as the card
+creator and owner. Use `--actor-id` when a specific board-scoped agent is doing
+the work, or create cards through the dashboard when the local human developer
+is the creator.
+
 Move or hand off a card:
 
 ```bash
@@ -292,6 +298,10 @@ python3 -m kanban_server.project card-move 1 \
   --handoff-sha <target-sha-after-work> \
   --check "python3 -m unittest discover -s tests"
 ```
+
+Use `--clear-blocker` when a resolved blocker should be removed while moving
+or handing off a card. Passing `--blocker ""` also clears the blocker text;
+omitting `--blocker` leaves existing blocker text unchanged.
 
 Link dependency cards from the CLI:
 
@@ -456,6 +466,12 @@ Participating AI agents should:
   integrated codebase takes priority over preserving local progress;
 - set the active card's target branch to the upcoming unreleased release branch,
   creating that release branch when needed instead of using `main` or `master`;
+- treat a user or repo instruction to use Codex Kanban, together with these
+  multi-agent workflow rules, as the explicit request for coordinated subagent
+  delegation required by Codex delegation tooling. Use that permission
+  proportionally: create/update the relevant cards first, use board-scoped
+  participant IDs, respect active-agent limits, and avoid overlapping write
+  scopes;
 - start review automatically after implementation cards complete when a
   delegation mechanism is available. The implementation agent should not leave a
   reviewer card merely `ready` unless no reviewer can be started;

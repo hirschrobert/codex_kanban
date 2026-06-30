@@ -67,7 +67,10 @@ python3 -m kanban_server.project snapshot \
 
 Create cards through the CLI when possible. Use `--why`, `--risk`, and
 `--acceptance` so a human can tell why the card exists and what could go wrong
-if it is skipped:
+if it is skipped. When `card-create` has `--board` and no explicit
+`--actor-id`, the CLI records the creator and owner as the board-scoped
+`<project-board-slug>-ai-agent-manager` participant instead of the local human
+developer:
 
 ```bash
 PYTHONPATH=/path/to/codex_kanban \
@@ -98,6 +101,10 @@ python3 -m kanban_server.project card-move <numeric-card-id> \
   --handoff-sha <target-sha-after-work> \
   --check "python3 -m unittest discover -s tests"
 ```
+
+Use `--clear-blocker` when a blocker has been resolved and should be removed
+from the card during a move or handoff. Passing `--blocker ""` also clears the
+blocker text; omitting `--blocker` leaves any existing blocker text unchanged.
 
 If an assignee is missing, register it first instead of inventing an id on the
 card:
@@ -198,12 +205,21 @@ Prefer subagents for parallel or specialist work, but keep the main agent
 responsible for routing, integration, card hygiene, and the final user-facing
 summary.
 
-An instruction to use Codex Kanban is standing permission to decompose work into
-cards and assign those cards to the registered abstract profiles. Actually
-spawning additional agents still depends on the tools available in the current
-session. If subagent spawning is not available, create or update the delegated
-cards anyway, then continue the work in the main session and make the limitation
-visible in the handoff.
+An instruction from the user or current repo to use Codex Kanban, together with
+these multi-agent workflow rules, is an explicit request for coordinated
+subagent delegation when that delegation is feasible and safe. Treat that as
+permission to decompose work into cards, assign those cards to the registered
+abstract profiles, and spawn well-scoped subagents when the current task
+naturally benefits from independent implementation, review, release-readiness,
+documentation, or audit work.
+
+This permission is bounded by the board: create or update the relevant
+parent/child cards first, use board-scoped participant IDs, respect active-agent
+limits, and avoid overlapping write scopes. Actually spawning additional agents
+still depends on the tools available in the current session. If subagent
+spawning is not available, create or update the delegated cards anyway, then
+continue the work in the main session and make the limitation visible in the
+handoff.
 
 When delegating, give each agent:
 
@@ -330,7 +346,10 @@ relevant. Useful optional gates are:
   or high-risk.
 
 Run independent specialists in parallel when their scopes are read-only or
-otherwise non-overlapping. Do not spawn every profile by default.
+otherwise non-overlapping. Do not spawn every profile by default, but do not
+leave useful implementation, review, release, or audit delegation idle merely
+because the human did not repeat the word "subagent" after selecting the Codex
+Kanban workflow.
 
 Recurring maintenance can be configured on cards with `Repeat` set to `daily`,
 `weekly`, or `monthly` and a `Repeat Time` in `HH:MM`. The dashboard server

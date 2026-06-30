@@ -25,6 +25,7 @@ const {
   coordinationWarningsForCard,
   potentialConflicts,
   conflictText,
+  coordinationConfirmationNeeded,
   assigneeChipText,
   cardOwnerText,
   cardCreatorText,
@@ -562,7 +563,11 @@ async function saveCard(event) {
   const proposedCard = Object.assign({}, id ? cardById(id) : {}, payload, {
     id: id || `new-${Date.now()}`,
   });
-  if (!confirmCoordination(proposedCard)) {
+  const currentCard = id ? cardById(id) : null;
+  if (
+    coordinationConfirmationNeeded(currentCard, proposedCard) &&
+    !confirmCoordination(proposedCard)
+  ) {
     return;
   }
   if (id) {
@@ -757,16 +762,31 @@ async function applyArchiveAction() {
   if (!targets.length) return;
   archiveActionButton.disabled = true;
   const archived = !state.showArchived;
-  const targetIds = new Set(targets.map((card) => String(card.id)));
+  const failed = [];
+  const completedIds = [];
   for (const card of targets) {
-    await updateCard(card.id, { archived });
+    try {
+      await updateCard(card.id, { archived });
+      completedIds.push(String(card.id));
+    } catch (error) {
+      failed.push({ card, error });
+    }
   }
   clearArchiveSelections();
   if (state.snapshot?.cards) {
-    state.snapshot.cards = state.snapshot.cards.filter((card) => !targetIds.has(String(card.id)));
+    const completedIdSet = new Set(completedIds);
+    state.snapshot.cards = state.snapshot.cards.filter(
+      (card) => !completedIdSet.has(String(card.id))
+    );
     render(state.snapshot);
   }
   await refresh();
+  if (failed.length) {
+    const labels = failed
+      .map(({ card }) => text(card.external_id, `#${card.id}`))
+      .join(", ");
+    window.alert(`Could not ${archived ? "archive" : "unarchive"} ${labels}.`);
+  }
 }
 
 function loadMoreOnScroll(element, stateKey, totalGetter, renderFn) {

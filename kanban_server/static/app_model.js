@@ -187,6 +187,31 @@ window.Kanban = window.Kanban || {};
     const label = conflict.external_id || `#${conflict.card_id}`;
     return `${label}: ${conflict.reasons.join("; ")}`;
   }
+
+  const coordinationConfirmationFields = [
+    "status",
+    "target_repo",
+    "target_branch",
+    "feature_branch",
+    "worktree_path",
+    "files_changed",
+  ];
+
+  function coordinationFieldValue(card, field) {
+    if (field === "files_changed") {
+      return JSON.stringify(listValues(card?.[field]));
+    }
+    return normalText(card?.[field]);
+  }
+
+  function coordinationConfirmationNeeded(currentCard, proposedCard) {
+    if (!currentCard) return true;
+    return coordinationConfirmationFields.some(
+      (field) =>
+        coordinationFieldValue(currentCard, field) !== coordinationFieldValue(proposedCard, field)
+    );
+  }
+
   function assigneeChipText(card) {
     const name = participantName(card.assignee_id);
     if (!card.assignee) return name;
@@ -253,6 +278,7 @@ window.Kanban = window.Kanban || {};
     conflictReasons,
     potentialConflicts,
     conflictText,
+    coordinationConfirmationNeeded,
     assigneeChipText,
     cardOwnerText,
     cardCreatorText,

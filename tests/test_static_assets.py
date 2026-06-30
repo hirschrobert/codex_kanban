@@ -37,6 +37,65 @@ class StaticAssetTest(unittest.TestCase):
         self.assertIn("Created: ${escapeHtml(cardCreatorText(card))}", app)
         self.assertIn("Assigned: ${escapeHtml(assigneeChipText(card))}", app)
 
+    def test_archive_action_continues_after_individual_failure(self) -> None:
+        app = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("const failed = [];", app)
+        self.assertIn("failed.push({ card, error });", app)
+        self.assertIn("Could not ${archived ? \"archive\" : \"unarchive\"}", app)
+
+    @unittest.skipUnless(shutil.which("node"), "node is required for JS runtime checks")
+    def test_archive_only_edit_skips_coordination_confirmation(self) -> None:
+        script = f"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+const staticDir = {json.dumps(str(STATIC_DIR))};
+
+const storage = {{ getItem() {{ return ""; }}, setItem() {{}} }};
+const context = vm.createContext({{
+  Date,
+  Intl,
+  JSON,
+  Set,
+  localStorage: storage,
+  window: {{}}
+}});
+context.window = context;
+
+for (const file of ["app_state.js", "app_model.js"]) {{
+  vm.runInContext(fs.readFileSync(`${{staticDir}}/${{file}}`, "utf8"), context, {{
+    filename: file
+  }});
+}}
+
+const current = {{
+  id: 1,
+  status: "in_progress",
+  target_repo: "/tmp/demo",
+  target_branch: "",
+  feature_branch: "",
+  worktree_path: "",
+  files_changed: []
+}};
+const archived = Object.assign({{}}, current, {{ archived: true }});
+const moved = Object.assign({{}}, current, {{ status: "review" }});
+
+if (context.window.Kanban.coordinationConfirmationNeeded(current, archived)) {{
+  throw new Error("archive-only edit asked for coordination confirmation");
+}}
+if (!context.window.Kanban.coordinationConfirmationNeeded(current, moved)) {{
+  throw new Error("status move skipped coordination confirmation");
+}}
+"""
+        result = subprocess.run(
+            ["node"],
+            input=script,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
     @unittest.skipUnless(shutil.which("node"), "node is required for JS runtime checks")
     def test_dashboard_scripts_evaluate_without_global_redeclarations(self) -> None:
         script = f"""

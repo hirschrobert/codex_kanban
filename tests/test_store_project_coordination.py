@@ -226,6 +226,40 @@ class KanbanStoreProjectCoordinationTest(unittest.TestCase):
         self.assertEqual(advanced["status"], "in_progress")
         self.assertEqual(advanced["blocked_by_child_external_ids"], [])
 
+    def test_archive_allowed_when_dependency_warning_exists(self) -> None:
+        store = self.make_store()
+        child = store.create_card(
+            {
+                "title": "Contract first",
+                "description": "Prerequisite contract work.",
+                "status": "done",
+            }
+        )
+        parent = store.create_card(
+            {
+                "title": "Implement after contract",
+                "description": "Implementation depends on the child card.",
+                "child_external_ids": [child["external_id"]],
+            }
+        )
+        active_parent = store.update_card(parent["id"], {"status": "in_progress"})
+        store.update_card(child["id"], {"status": "ready"})
+
+        warned_parent = store.get_card(active_parent["id"])
+        assert warned_parent is not None
+        self.assertEqual(
+            warned_parent["blocked_by_child_external_ids"],
+            [child["external_id"]],
+        )
+
+        archived = store.update_card(
+            warned_parent["id"],
+            {"archived": True, "status": warned_parent["status"]},
+        )
+
+        self.assertTrue(archived["archived"])
+        self.assertEqual(archived["status"], "in_progress")
+
     def test_card_dependencies_reject_unknown_self_and_cycles(self) -> None:
         store = self.make_store()
         first = store.create_card(

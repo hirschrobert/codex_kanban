@@ -14,6 +14,7 @@ from .payloads import (
     _agent_profiles,
     _card_payload,
     _card_update_payload,
+    _default_ai_agent_manager_payload_for_args,
     _participant_payload,
     _registration_payload,
     _workflow_payload,
@@ -65,20 +66,25 @@ def snapshot(args: argparse.Namespace) -> int:
 
 def card_create(args: argparse.Namespace) -> int:
     payload = _card_payload(args)
+    default_actor = _default_ai_agent_manager_payload_for_args(args)
     if args.server_url:
+        if default_actor:
+            _post_json(args.server_url, "/api/participants", default_actor)
         result = _post_json(args.server_url, "/api/cards", payload)
         if result is not None:
             _print_json(result)
             return 0
 
     store = KanbanStore(args.db)
+    if default_actor:
+        store.upsert_participant(default_actor)
     card = store.create_card(payload)
     store.create_event(
         {
             "board_slug": card["board_slug"],
             "event_type": "card.created",
             "card_id": card["id"],
-            "participant_id": args.actor_id,
+            "participant_id": payload.get("actor_id"),
             "message": card["title"],
             "metadata": {"status": card["status"]},
         }
@@ -199,6 +205,9 @@ PYTHONPATH={CODEX_KANBAN_REPO_ROOT} python3 -m kanban_server.project register \\
 After registration, use board `{slug}` as the shared orchestration surface.
 Use the `codex-kanban` skill to respect human-added cards, work only on the
 assigned card/scope, and delegate to the reusable agent profiles: {profiles}.
+This is an explicit request for coordinated subagent delegation when feasible
+and safe: create/update the relevant cards, use board-scoped participant IDs,
+respect active-agent limits, and avoid overlapping write scopes.
 
 Concrete project rules stay in this repo's AGENTS.md; do not copy domain rules
 into the global Kanban app.

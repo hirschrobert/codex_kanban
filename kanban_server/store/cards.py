@@ -363,7 +363,9 @@ class CardStoreMixin(_StoreMixinContract):
             updated = self._one(conn, "SELECT * FROM cards WHERE id = ?", (card_id,))
             if not updated:
                 raise KeyError(f"card {card_id} not found")
-            self._assert_dependencies_allow_status(conn, card_id, updated["status"])
+            status_changed = "status" in updates and updates["status"] != current["status"]
+            if status_changed:
+                self._assert_dependencies_allow_status(conn, card_id, updated["status"])
             card = self._card_from_row(updated)
             self._attach_dependency_links(conn, [card])
             return card
