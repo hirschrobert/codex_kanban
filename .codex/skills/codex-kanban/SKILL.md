@@ -213,6 +213,15 @@ abstract profiles, and spawn well-scoped subagents when the current task
 naturally benefits from independent implementation, review, release-readiness,
 documentation, or audit work.
 
+For Codex clients whose subagent tool says delegation needs an explicit user
+request, the active use of this skill through a repo or user instruction is that
+explicit request for the bounded Kanban workflow. Do not wait for the human to
+repeat "spawn a subagent" before starting useful read-only reviewers,
+architects, release managers, auditors, or non-overlapping implementers. Still
+perform the tool's critical-path check first: keep immediate blocking work in
+the main session, delegate sidecar or disjoint work, and avoid duplicate or
+overlapping writes.
+
 This permission is bounded by the board: create or update the relevant
 parent/child cards first, use board-scoped participant IDs, respect active-agent
 limits, and avoid overlapping write scopes. Actually spawning additional agents
@@ -265,6 +274,34 @@ lands, refresh the worktree from the current target branch and record the new
 starting or handoff SHA. Active unfinished work should target the upcoming
 unreleased release branch; if no such release branch exists, create one instead
 of targeting `main` or `master`.
+
+## Release Intake And Exclusion Audit
+
+For release, deploy, or "merge releases to main" work, the release scope is all
+completed, approved, or requested work ahead of the maintained integration
+branch unless the human or project instructions explicitly exclude it. Do not
+select only the card that is currently in focus.
+
+Before preparing, reviewing, merging, tagging, publishing, or deploying a
+release, perform a release intake audit for every registered repo in scope:
+
+- enumerate release/prerelease branches and task branches ahead of the
+  maintained integration branch;
+- enumerate ready, in-progress, review, blocked, and done cards that target the
+  release branch, repo, or a branch ahead of the integration branch;
+- compare the cards, branches, and commits so each ahead-of-integration change
+  has exactly one disposition: included in this release, explicitly excluded
+  with a reason, or blocked with the blocker recorded;
+- include done cards and reviewed implementation branches by default, even when
+  they are not the newest card in the conversation;
+- stop the release handoff if a done/approved card or ahead branch has no
+  include/exclude disposition.
+
+Record the intake result on the release card or handoff: included card IDs and
+branches, excluded card IDs and branches with reasons, conflicts, checks, final
+target SHA, and any dirty worktree changes intentionally excluded. When a
+feature branch contains work for multiple cards, include the whole intended
+branch or split/revert only with explicit human approval and a recorded reason.
 
 ## Card And Handoff Contract
 
