@@ -60,6 +60,10 @@ human developers, the main AI agent, and optional AI subagents.
   generated coordination state.
 - Public pushes must target explicit release branches or tags only. Do not
   mirror every local ref from a development repository.
+- The full CI workflow runs on release branches, not on main pushes. Advance
+  `main` only by fast-forwarding it to the exact release commit SHA that passed
+  CI on `release/**`; do not merge, squash, rebase, or create a new main-only
+  commit.
 - Rewriting author metadata, signatures, or local refs is destructive release
   preparation and requires explicit human approval plus the intended public
   author/signing identity.

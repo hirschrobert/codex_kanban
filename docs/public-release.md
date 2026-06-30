@@ -13,15 +13,24 @@ Use this checklist before pushing this repository to a public GitHub remote.
 
 ## Git Refs
 
-Push only the intended release branch or tag:
+Push only the intended release branch or tag, then fast-forward `main` to the
+same commit SHA after release-branch CI passes:
 
 ```bash
-git push origin release/0.1.1
+git push origin refs/heads/release/0.1.3:refs/heads/release/0.1.3
+git push origin refs/heads/release/0.1.3:refs/heads/main
+git push origin refs/tags/v0.1.3:refs/tags/v0.1.3
 ```
 
 Do not use `git push --mirror` or `git push --all` from a working repository
 that may contain development-only refs. If a clean public export is needed,
 clone only the intended branch into a fresh directory and push from that clone.
+
+The repository protects `main` with the `test` status check. Because full CI
+runs on `release/**` and not on `main` pushes, `main` should accept only a
+commit SHA that already passed release-branch CI. A merge commit, squash commit,
+or rebased main-only SHA will not have the release-branch check attached and
+should be rejected.
 
 ## Git Identity
 
