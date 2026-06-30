@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.1.2 - 2026-06-30
+
+This release improves dashboard cleanup, CLI handoff hygiene, and AI-agent
+coordination for Codex Kanban projects.
+
+Public commit:
+
+- `aa05ba8` improves warning-card archiving, CLI blocker clearing, default AI
+  manager attribution for CLI-created cards, and Codex Kanban delegation
+  guidance.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the 0.1.1 changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Fixed dashboard archiving so cards with coordination or dependency warnings
+  can still be archived, and bulk archive continues when one selected card
+  fails.
+- Added `card-move --clear-blocker` and support for `--blocker ""` so agents
+  can clear stale blocker text without raw API PATCH calls.
+- Made CLI-created cards with `--board` default to a board-scoped
+  `AI Agent Manager` actor instead of the local human developer identity.
+- Clarified Codex Kanban subagent delegation guidance in the skill, docs, hook
+  context, and project prompt text.
+- Added regression tests for warning-card archiving, blocker clearing, and
+  default CLI card creator attribution.
+
+AI disclosure:
+
+This release was developed with help from AI agents using GPT-5, coordinated
+through the Codex Kanban workflow.
+
 ## 0.1.1 - 2026-06-29
 
 This release prepares the Codex Kanban dashboard for coordinated AI-assisted

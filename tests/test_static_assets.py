@@ -42,7 +42,7 @@ class StaticAssetTest(unittest.TestCase):
 
         self.assertIn("const failed = [];", app)
         self.assertIn("failed.push({ card, error });", app)
-        self.assertIn("Could not ${archived ? \"archive\" : \"unarchive\"}", app)
+        self.assertIn('Could not ${archived ? "archive" : "unarchive"}', app)
 
     @unittest.skipUnless(shutil.which("node"), "node is required for JS runtime checks")
     def test_archive_only_edit_skips_coordination_confirmation(self) -> None:
