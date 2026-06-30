@@ -222,6 +222,11 @@ perform the tool's critical-path check first: keep immediate blocking work in
 the main session, delegate sidecar or disjoint work, and avoid duplicate or
 overlapping writes.
 
+Release work should start a read-only `project_release_manager` or
+`kanban_auditor` for the intake audit whenever a subagent tool is available and
+the task is more than a trivial status check; if no subagent can be spawned,
+record that limitation on the release card before doing the audit inline.
+
 This permission is bounded by the board: create or update the relevant
 parent/child cards first, use board-scoped participant IDs, respect active-agent
 limits, and avoid overlapping write scopes. Actually spawning additional agents
