@@ -110,6 +110,48 @@ class ProjectCliTest(unittest.TestCase):
         self.assertEqual(card["created_by_name"], "AI Agent Manager")
         self.assertEqual(card["created_by_kind"], "agent")
 
+    def test_card_create_records_main_agent_intake_metadata(self) -> None:
+        db_path = self.make_db_path()
+        output = io.StringIO()
+
+        with contextlib.redirect_stdout(output):
+            exit_code = project.main(
+                [
+                    "card-create",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--title",
+                    "PDF preview fails",
+                    "--description",
+                    "Opening an uploaded PDF shows a blank panel.",
+                    "--intake-kind",
+                    "error_report",
+                    "--reported-by",
+                    "Front desk",
+                    "--impact",
+                    "Blocks invoice review.",
+                    "--evidence",
+                    "Observed in the desktop client.",
+                    "--affected-path",
+                    "/workspace/app",
+                    "--affected-path",
+                    "/workspace/db_worker",
+                ]
+            )
+
+        card = json.loads(output.getvalue())
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(card["created_by_id"], "demo-ai-agent-manager")
+        self.assertEqual(card["intake_kind"], "error_report")
+        self.assertEqual(card["intake_source"], "main_agent")
+        self.assertEqual(card["reported_by"], "Front desk")
+        self.assertEqual(card["impact"], "Blocks invoice review.")
+        self.assertEqual(card["evidence"], "Observed in the desktop client.")
+        self.assertEqual(card["affected_paths"], ["/workspace/app", "/workspace/db_worker"])
+
     def test_card_create_reports_bad_assignee_without_traceback(self) -> None:
         db_path = self.make_db_path()
 

@@ -236,6 +236,20 @@ window.Kanban = window.Kanban || {};
     return "Untracked";
   }
 
+  function titleCaseToken(value) {
+    return normalText(value)
+      .replace(/[_-]+/g, " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  function intakeKindText(card) {
+    return titleCaseToken(card?.intake_kind);
+  }
+
+  function intakeSourceText(card) {
+    return titleCaseToken(card?.intake_source);
+  }
+
   function confirmCoordination(card) {
     if (!activeConflictStatuses.has(card?.status)) return true;
     const conflicts = potentialConflicts(card);
@@ -282,6 +296,8 @@ window.Kanban = window.Kanban || {};
     assigneeChipText,
     cardOwnerText,
     cardCreatorText,
+    intakeKindText,
+    intakeSourceText,
     confirmCoordination,
   });
 }

@@ -50,6 +50,63 @@ class KanbanStoreTest(unittest.TestCase):
 
         self.assertEqual(moved["status"], "in_progress")
 
+    def test_intake_metadata_round_trips(self) -> None:
+        store = self.make_store()
+
+        card = store.create_card(
+            {
+                "title": "PDF preview fails",
+                "description": "Opening an uploaded PDF shows a blank panel.",
+                "intake_kind": "error_report",
+                "intake_source": "main_agent",
+                "reported_by": "Front desk",
+                "impact": "Blocks invoice review.",
+                "evidence": "Observed in the desktop client.",
+                "affected_paths": ["/workspace/app", "/workspace/db_worker"],
+            }
+        )
+        updated = store.update_card(
+            card["id"],
+            {
+                "intake_kind": "feature_request",
+                "intake_source": "dashboard",
+                "reported_by": "Operations",
+                "impact": "Reduces manual sorting.",
+                "evidence": "Requested during triage.",
+                "affected_paths": "/workspace/portal\n/workspace/extension",
+            },
+        )
+        cleared = store.update_card(
+            card["id"],
+            {
+                "intake_kind": "",
+                "intake_source": "",
+                "reported_by": "",
+                "impact": "",
+                "evidence": "",
+                "affected_paths": "",
+            },
+        )
+
+        self.assertEqual(card["intake_kind"], "error_report")
+        self.assertEqual(card["intake_source"], "main_agent")
+        self.assertEqual(card["reported_by"], "Front desk")
+        self.assertEqual(card["impact"], "Blocks invoice review.")
+        self.assertEqual(card["evidence"], "Observed in the desktop client.")
+        self.assertEqual(card["affected_paths"], ["/workspace/app", "/workspace/db_worker"])
+        self.assertEqual(updated["intake_kind"], "feature_request")
+        self.assertEqual(updated["intake_source"], "dashboard")
+        self.assertEqual(updated["reported_by"], "Operations")
+        self.assertEqual(updated["impact"], "Reduces manual sorting.")
+        self.assertEqual(updated["evidence"], "Requested during triage.")
+        self.assertEqual(updated["affected_paths"], ["/workspace/portal", "/workspace/extension"])
+        self.assertEqual(cleared["intake_kind"], "")
+        self.assertEqual(cleared["intake_source"], "")
+        self.assertEqual(cleared["reported_by"], "")
+        self.assertEqual(cleared["impact"], "")
+        self.assertEqual(cleared["evidence"], "")
+        self.assertEqual(cleared["affected_paths"], [])
+
     def test_snapshot_unknown_board_falls_back_without_creating_board(self) -> None:
         store = self.make_store()
         self.register_demo_project(store)

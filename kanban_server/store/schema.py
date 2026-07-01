@@ -104,6 +104,11 @@ class SchemaStoreMixin(_StoreMixinContract):
                     created_by_id TEXT,
                     created_by_name TEXT NOT NULL DEFAULT 'local developer',
                     created_by_kind TEXT NOT NULL DEFAULT 'human',
+                    intake_kind TEXT NOT NULL DEFAULT '',
+                    intake_source TEXT NOT NULL DEFAULT '',
+                    reported_by TEXT NOT NULL DEFAULT '',
+                    impact TEXT NOT NULL DEFAULT '',
+                    evidence TEXT NOT NULL DEFAULT '',
                     priority TEXT NOT NULL DEFAULT 'normal',
                     target_repo TEXT,
                     target_branch TEXT,
@@ -114,6 +119,7 @@ class SchemaStoreMixin(_StoreMixinContract):
                     blocker_reason TEXT,
                     parent_external_id TEXT,
                     child_external_ids TEXT NOT NULL DEFAULT '[]',
+                    affected_paths TEXT NOT NULL DEFAULT '[]',
                     files_changed TEXT NOT NULL DEFAULT '[]',
                     checks TEXT NOT NULL DEFAULT '[]',
                     assumptions TEXT NOT NULL DEFAULT '[]',
@@ -219,6 +225,42 @@ class SchemaStoreMixin(_StoreMixinContract):
                 "cards",
                 "created_by_kind",
                 "TEXT NOT NULL DEFAULT 'human'",
+            )
+            self._ensure_column(
+                conn,
+                "cards",
+                "intake_kind",
+                "TEXT NOT NULL DEFAULT ''",
+            )
+            self._ensure_column(
+                conn,
+                "cards",
+                "intake_source",
+                "TEXT NOT NULL DEFAULT ''",
+            )
+            self._ensure_column(
+                conn,
+                "cards",
+                "reported_by",
+                "TEXT NOT NULL DEFAULT ''",
+            )
+            self._ensure_column(
+                conn,
+                "cards",
+                "impact",
+                "TEXT NOT NULL DEFAULT ''",
+            )
+            self._ensure_column(
+                conn,
+                "cards",
+                "evidence",
+                "TEXT NOT NULL DEFAULT ''",
+            )
+            self._ensure_column(
+                conn,
+                "cards",
+                "affected_paths",
+                "TEXT NOT NULL DEFAULT '[]'",
             )
             self._ensure_column(conn, "cards", "repeat_cadence", "TEXT NOT NULL DEFAULT 'none'")
             self._ensure_column(

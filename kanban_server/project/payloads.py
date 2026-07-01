@@ -112,6 +112,9 @@ def _card_payload(args: argparse.Namespace) -> dict[str, Any]:
     actor_id = args.actor_id
     if not actor_id and args.board:
         actor_id = _default_ai_agent_manager_id(args.board)
+    intake_source = args.intake_source
+    if not intake_source and args.board and not args.actor_id:
+        intake_source = "main_agent"
     payload = {
         "board_slug": args.board,
         "title": args.title,
@@ -126,6 +129,12 @@ def _card_payload(args: argparse.Namespace) -> dict[str, Any]:
         "assignee_id": args.assignee,
         "owner_id": args.owner or actor_id,
         "actor_id": actor_id,
+        "intake_kind": args.intake_kind,
+        "intake_source": intake_source,
+        "reported_by": args.reported_by,
+        "impact": args.impact,
+        "evidence": args.evidence,
+        "affected_paths": args.affected_path or [],
         "target_repo": args.target_repo,
         "target_branch": args.target_branch,
         "starting_target_sha": args.start_sha,

@@ -217,6 +217,11 @@ class CardStoreMixin(_StoreMixinContract):
                 "created_by_id": created_by_id,
                 "created_by_name": created_by_name,
                 "created_by_kind": created_by_kind,
+                "intake_kind": self._clean_text(payload.get("intake_kind")) or "",
+                "intake_source": self._clean_text(payload.get("intake_source")) or "",
+                "reported_by": self._clean_text(payload.get("reported_by")) or "",
+                "impact": self._clean_text(payload.get("impact")) or "",
+                "evidence": self._clean_text(payload.get("evidence")) or "",
                 "priority": priority,
                 "target_repo": self._clean_text(payload.get("target_repo")),
                 "target_branch": self._clean_text(payload.get("target_branch")),
@@ -227,6 +232,7 @@ class CardStoreMixin(_StoreMixinContract):
                 "blocker_reason": self._clean_text(payload.get("blocker_reason")),
                 "parent_external_id": None,
                 "child_external_ids": "[]",
+                "affected_paths": _json_dumps(_normalise_list(payload.get("affected_paths"))),
                 "files_changed": _json_dumps(_normalise_list(payload.get("files_changed"))),
                 "checks": _json_dumps(_normalise_list(payload.get("checks"))),
                 "assumptions": _json_dumps(_normalise_list(payload.get("assumptions"))),
@@ -302,6 +308,14 @@ class CardStoreMixin(_StoreMixinContract):
                         board_slug=current["board_slug"],
                         current_owner_id=current["owner_id"],
                     )
+                if field in {
+                    "intake_kind",
+                    "intake_source",
+                    "reported_by",
+                    "impact",
+                    "evidence",
+                }:
+                    value = value or ""
                 if field == "repeat_cadence":
                     value = self._validate_repeat_cadence(value or "none")
                 if field == "repeat_time":

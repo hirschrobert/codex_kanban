@@ -40,6 +40,32 @@ Use this coordination surface proportionally:
 5. Keep status visible: report start, block, handoff, and finish through the
    ingester or HTTP API.
 
+## Human Request Intake
+
+The primary intake path is that a human tells the main AI agent what they want:
+a feature request, error report, release concern, or maintenance need. The main
+agent translates that request into one or more durable cards, records enough
+metadata for another agent to continue without the chat transcript, and then
+coordinates implementation, review, CI, and release-readiness through normal
+Kanban handoffs.
+
+Direct dashboard card entry remains optional. Human-added cards are still
+authoritative work requests, but humans do not need to manually enter cards
+before asking the main agent to help.
+
+For human-originated feature requests or error reports, prefer adding intake
+metadata:
+
+- `intake_kind`: for example `feature_request`, `error_report`,
+  `coordination`, `maintenance`, `review`, or `release`;
+- `intake_source`: normally `main_agent` for conversational intake, or
+  `dashboard`, `cli`, or `automation` for other paths;
+- `reported_by`, `impact`, `evidence`, and `affected_paths` when known.
+
+For multi-repo ecosystem boards, use `affected_paths` for the apps, repos,
+worktrees, or files implicated by the human report. Keep concrete domain rules
+in the registered project instructions instead of hardcoding them into Kanban.
+
 Useful commands:
 
 ```bash
@@ -79,6 +105,10 @@ python3 -m kanban_server.project card-create \
   --board <project-board-slug> \
   --title "Review branch before merge" \
   --description "Inspect the feature branch for regressions before handoff." \
+  --intake-kind feature_request \
+  --reported-by "Operations" \
+  --impact "Blocks the next release handoff." \
+  --affected-path <repo-or-app-path> \
   --why "The implementation changed shared behavior and needs an independent read." \
   --risk "A subtle regression could be merged because the original implementer has context bias." \
   --acceptance "Reviewer records findings or explicitly marks the card done with checks run." \

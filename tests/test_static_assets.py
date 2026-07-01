@@ -31,11 +31,41 @@ class StaticAssetTest(unittest.TestCase):
         model = (STATIC_DIR / "app_model.js").read_text(encoding="utf-8")
         self.assertIn("function cardOwnerText(card)", model)
         self.assertIn("function cardCreatorText(card)", model)
+        self.assertIn("function intakeKindText(card)", model)
+        self.assertIn("function intakeSourceText(card)", model)
         self.assertIn("function ensureSelectOption(select, value, label)", app)
         self.assertIn("ensureSelectOption(cardForm.elements.owner_id", app)
         self.assertIn("Owner: ${escapeHtml(cardOwnerText(card))}", app)
         self.assertIn("Created: ${escapeHtml(cardCreatorText(card))}", app)
         self.assertIn("Assigned: ${escapeHtml(assigneeChipText(card))}", app)
+        self.assertIn('${intakeKind ? `<span class="chip">${escapeHtml(intakeKind)}</span>`', app)
+        self.assertIn("Affected: ${affectedCount}", app)
+
+    def test_card_form_exposes_optional_intake_fields(self) -> None:
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        app = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+
+        for field in [
+            'name="intake_kind"',
+            'name="intake_source"',
+            'name="reported_by"',
+            'name="impact"',
+            'name="affected_paths"',
+            'name="evidence"',
+        ]:
+            self.assertIn(field, html)
+        self.assertIn("cardForm.elements.intake_source.value = card ? card?.intake_source", app)
+        self.assertIn("payload.affected_paths = formList(payload.affected_paths);", app)
+
+    def test_dashboard_exposes_version_hash_tag(self) -> None:
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        app = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (STATIC_DIR / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('id="version-tag"', html)
+        self.assertIn("function renderVersionTag(app)", app)
+        self.assertIn("renderVersionTag(snapshot.app);", app)
+        self.assertIn(".version-pill", styles)
 
     def test_archive_action_continues_after_individual_failure(self) -> None:
         app = (STATIC_DIR / "app.js").read_text(encoding="utf-8")

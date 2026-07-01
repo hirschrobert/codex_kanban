@@ -56,6 +56,7 @@ PARTICIPANT_STATUSES = {
 }
 
 JSON_LIST_FIELDS = {
+    "affected_paths",
     "files_changed",
     "checks",
     "assumptions",
@@ -93,6 +94,11 @@ CARD_TEXT_FIELDS = {
     "status",
     "assignee_id",
     "owner_id",
+    "intake_kind",
+    "intake_source",
+    "reported_by",
+    "impact",
+    "evidence",
     "priority",
     "target_repo",
     "target_branch",

@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import parse_qs, unquote, urlparse
 
+from .app_metadata import app_metadata as current_app_metadata
 from .store.core import KanbanStore
 from .store.support import DEFAULT_DB_PATH
 
@@ -57,7 +58,12 @@ class EventBroker:
         for client in clients:
             self._put(client, message)
 
-    def publish_snapshots(self, board_slug: str, store: KanbanStore) -> None:
+    def publish_snapshots(
+        self,
+        board_slug: str,
+        store: KanbanStore,
+        app_metadata: dict[str, Any] | None = None,
+    ) -> None:
         with self._lock:
             clients = [
                 (client, dict(settings))
@@ -76,6 +82,7 @@ class EventBroker:
                     include_archived=snapshot_key[0],
                     archived_only=snapshot_key[1],
                 )
+                snapshots[snapshot_key]["app"] = dict(app_metadata or {})
             self._put(
                 client,
                 {
@@ -112,11 +119,13 @@ class KanbanHTTPServer(ThreadingHTTPServer):
         store: KanbanStore,
         static_dir: Path,
         default_board_slug: str | None = None,
+        app_metadata: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(server_address, handler_class)
         self.store = store
         self.static_dir = static_dir
         self.default_board_slug = default_board_slug
+        self.app_metadata = current_app_metadata() if app_metadata is None else app_metadata
         self.broker = EventBroker()
         self.scheduler_stop = threading.Event()
 
@@ -155,7 +164,7 @@ class KanbanHandler(BaseHTTPRequestHandler):
                     "on",
                 }
                 self._send_json(
-                    self.kanban_server.store.snapshot(
+                    self._snapshot(
                         board or self.kanban_server.default_board_slug,
                         include_archived=include_archived,
                         archived_only=archived_only,
@@ -318,9 +327,7 @@ class KanbanHandler(BaseHTTPRequestHandler):
                     result["card"]["board_slug"] for result in results if result.get("card")
                 }
                 for board_slug in board_slugs:
-                    self.kanban_server.broker.publish_snapshots(
-                        board_slug, self.kanban_server.store
-                    )
+                    self._broadcast(board_slug)
                 self._send_json({"results": results})
                 return
 
@@ -457,7 +464,11 @@ class KanbanHandler(BaseHTTPRequestHandler):
             self._send_error(exc)
 
     def _broadcast(self, board_slug: str) -> None:
-        self.kanban_server.broker.publish_snapshots(board_slug, self.kanban_server.store)
+        self.kanban_server.broker.publish_snapshots(
+            board_slug,
+            self.kanban_server.store,
+            self.kanban_server.app_metadata,
+        )
 
     def _broadcast_project_change(self, board_slug: str | None = None) -> None:
         board_slugs = self.kanban_server.broker.board_slugs()
@@ -488,7 +499,7 @@ class KanbanHandler(BaseHTTPRequestHandler):
         try:
             self._write_sse(
                 "snapshot",
-                self.kanban_server.store.snapshot(
+                self._snapshot(
                     board_slug,
                     include_archived=include_archived,
                     archived_only=archived_only,
@@ -510,6 +521,21 @@ class KanbanHandler(BaseHTTPRequestHandler):
         payload = json.dumps(data, ensure_ascii=True)
         self.wfile.write(f"event: {event}\ndata: {payload}\n\n".encode())
         self.wfile.flush()
+
+    def _snapshot(
+        self,
+        board_slug: str | None,
+        *,
+        include_archived: bool = False,
+        archived_only: bool = False,
+    ) -> dict[str, Any]:
+        snapshot = self.kanban_server.store.snapshot(
+            board_slug,
+            include_archived=include_archived,
+            archived_only=archived_only,
+        )
+        snapshot["app"] = dict(self.kanban_server.app_metadata)
+        return snapshot
 
     def _serve_static(self, request_path: str) -> None:
         if request_path in {"", "/"}:
@@ -581,7 +607,11 @@ def _run_scheduler(server: KanbanHTTPServer) -> None:
             results = server.store.run_due_repeating_cards()
             board_slugs = {result["card"]["board_slug"] for result in results if result.get("card")}
             for board_slug in board_slugs:
-                server.broker.publish_snapshots(board_slug, server.store)
+                server.broker.publish_snapshots(
+                    board_slug,
+                    server.store,
+                    server.app_metadata,
+                )
         except Exception as exc:
             sys.stderr.write(f"Codex Kanban scheduler error: {exc}\n")
         server.scheduler_stop.wait(60)

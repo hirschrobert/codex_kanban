@@ -49,16 +49,31 @@ dashboard dropdown.
 
 ## Manual Dialogs
 
+The primary intake path is conversational: a human gives a feature request,
+error report, or release concern to the main AI agent for the project. The main
+agent records the request as one or more cards, chooses the relevant
+board-scoped participants, and then coordinates implementation, review, CI, and
+release-readiness handoffs through the board.
+
+Direct dashboard entry is optional. It is useful when a human wants to seed a
+card without starting an agent session yet, but it is not required for normal
+continuous development.
+
 For a new card, fill only:
 
 - `Title`: short task name.
 - `Description`: concrete request, acceptance criteria, or enough context for a
   human or agent to know what done means.
 
-All other card fields are optional. `Status` defaults to `Backlog`, `Priority`
-defaults to `Normal`, `Repeat` defaults to `None`, and `Assignee` can stay
-unassigned until a human or agent takes the card. Branch, repo, SHA, blocker,
-and checks fields are for later handoffs or specialist work.
+All other card fields are optional. `Intake` can mark a feature request, error
+report, coordination task, maintenance task, review, or release item. `Source`
+can distinguish main-agent intake from dashboard, CLI, or automation-created
+cards. `Reported By`, `Impact`, `Affected Paths`, and `Evidence` preserve
+human context so another agent can continue without reading the chat
+transcript. `Status` defaults to `Backlog`, `Priority` defaults to `Normal`,
+`Repeat` defaults to `None`, and `Assignee` can stay unassigned until a human
+or agent takes the card. Branch, repo, SHA, blocker, and checks fields are for
+later handoffs or specialist work.
 
 Cards can also be linked as dependencies. A parent card depends on its child
 cards. In the generic dashboard policy, a parent cannot move into
@@ -277,11 +292,33 @@ python3 -m kanban_server.project card-create \
   --check "python3 -m unittest discover -s tests"
 ```
 
+When the main AI agent receives a human feature request or error report, add
+intake metadata while creating the card:
+
+```bash
+PYTHONPATH="$(pwd)" \
+python3 -m kanban_server.project card-create \
+  --server-url http://127.0.0.1:8766 \
+  --board my-project \
+  --title "PDF preview fails" \
+  --description "Opening an uploaded PDF shows a blank panel." \
+  --intake-kind error_report \
+  --reported-by "Front desk" \
+  --impact "Blocks invoice review." \
+  --evidence "Observed in the desktop client after selecting a recent upload." \
+  --affected-path /workspace/my-project/app \
+  --affected-path /workspace/my-project/backend \
+  --assignee my-project-project-implementer \
+  --target-branch release/current \
+  --check "python3 -m unittest discover -s tests"
+```
+
 When `card-create` includes `--board` and no explicit `--actor-id`, the CLI
 creates or reuses `<board>-ai-agent-manager` and records that agent as the card
-creator and owner. Use `--actor-id` when a specific board-scoped agent is doing
-the work, or create cards through the dashboard when the local human developer
-is the creator.
+creator and owner. It also defaults `intake_source` to `main_agent`, matching
+the normal conversational intake path. Use `--actor-id` when a specific
+board-scoped agent is doing the work, or create cards through the dashboard
+when the local human developer is the creator.
 
 Move or hand off a card:
 

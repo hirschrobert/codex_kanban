@@ -31,7 +31,11 @@ class ServerDefaultsTest(unittest.TestCase):
         )
 
     def start_server(
-        self, store: KanbanStore, *, default_board_slug: str | None = None
+        self,
+        store: KanbanStore,
+        *,
+        default_board_slug: str | None = None,
+        app_metadata: dict[str, Any] | None = None,
     ) -> server.KanbanHTTPServer:
         httpd = server.KanbanHTTPServer(
             ("127.0.0.1", 0),
@@ -39,6 +43,7 @@ class ServerDefaultsTest(unittest.TestCase):
             store=store,
             static_dir=server.STATIC_DIR,
             default_board_slug=default_board_slug,
+            app_metadata=app_metadata,
         )
         thread = threading.Thread(target=httpd.serve_forever, daemon=True)
         thread.start()
@@ -138,6 +143,25 @@ class ServerDefaultsTest(unittest.TestCase):
 
             self.assertEqual(body["board"]["slug"], "demo")
             self.assertEqual([card["title"] for card in body["cards"]], ["Visible card"])
+
+    def test_snapshot_includes_app_version_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = KanbanStore(Path(tmp) / "kanban.sqlite3")
+            app_metadata = {
+                "name": "codex-kanban",
+                "version": "9.8.7",
+                "hash": "abc1234",
+                "dirty": False,
+            }
+            httpd = self.start_server(store, app_metadata=app_metadata)
+
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{httpd.server_address[1]}/api/snapshot",
+                timeout=3,
+            ) as response:
+                body = json.loads(response.read().decode("utf-8"))
+
+            self.assertEqual(body["app"], app_metadata)
 
     def test_snapshot_unknown_board_uses_server_preferred_board(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -406,6 +430,49 @@ class ServerDefaultsTest(unittest.TestCase):
             self.assertEqual(updated["comment_count"], 1)
             self.assertEqual(updated["comments"][0]["body"], "Use the latest handoff note.")
             self.assertEqual(updated["comments"][0]["author_name"], "local developer")
+
+    def test_post_and_patch_card_intake_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = KanbanStore(Path(tmp) / "kanban.sqlite3")
+            httpd = self.start_server(store)
+
+            status, card = self.request_json(
+                httpd,
+                "/api/cards",
+                {
+                    "board_slug": "demo",
+                    "title": "Portal sorting request",
+                    "description": "Show newest invoices first.",
+                    "intake_kind": "feature_request",
+                    "intake_source": "dashboard",
+                    "reported_by": "Operations",
+                    "impact": "Reduces manual searching.",
+                    "evidence": "Requested during triage.",
+                    "affected_paths": ["/workspace/portal"],
+                },
+            )
+            patch_status, updated = self.request_json(
+                httpd,
+                f"/api/cards/{card['id']}",
+                {
+                    "intake_source": "main_agent",
+                    "affected_paths": ["/workspace/portal", "/workspace/db_worker"],
+                },
+                method="PATCH",
+            )
+
+            self.assertEqual(status, 201)
+            self.assertEqual(card["intake_kind"], "feature_request")
+            self.assertEqual(card["intake_source"], "dashboard")
+            self.assertEqual(card["reported_by"], "Operations")
+            self.assertEqual(card["impact"], "Reduces manual searching.")
+            self.assertEqual(card["evidence"], "Requested during triage.")
+            self.assertEqual(card["affected_paths"], ["/workspace/portal"])
+            self.assertEqual(patch_status, 200)
+            self.assertEqual(updated["intake_source"], "main_agent")
+            self.assertEqual(
+                updated["affected_paths"], ["/workspace/portal", "/workspace/db_worker"]
+            )
 
     def test_delete_card_requires_archived_card(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

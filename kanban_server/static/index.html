@@ -26,6 +26,7 @@
             <span>Archived</span>
           </label>
           <button id="archive-action-button" class="ghost-button" type="button" disabled>Archive</button>
+          <span id="version-tag" class="version-pill" title="Codex Kanban build">v0.1.2</span>
           <span id="live-state" class="live-pill">Connecting</span>
           <button id="settings-button" class="ghost-button" type="button">Settings</button>
           <button id="new-card-button" class="primary-button" type="button">New Card</button>
@@ -81,6 +82,36 @@ Acceptance criteria:
 - Observable condition for done or handoff."></textarea>
         </label>
         <div class="form-grid">
+          <label>
+            <span>Intake</span>
+            <select name="intake_kind">
+              <option value="">General</option>
+              <option value="feature_request">Feature Request</option>
+              <option value="error_report">Error Report</option>
+              <option value="coordination">Coordination</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="review">Review</option>
+              <option value="release">Release</option>
+            </select>
+          </label>
+          <label>
+            <span>Source</span>
+            <select name="intake_source">
+              <option value="">Unspecified</option>
+              <option value="main_agent">Main Agent</option>
+              <option value="dashboard">Dashboard</option>
+              <option value="cli">CLI</option>
+              <option value="automation">Automation</option>
+            </select>
+          </label>
+          <label>
+            <span>Reported By</span>
+            <input name="reported_by" autocomplete="off">
+          </label>
+          <label>
+            <span>Impact</span>
+            <input name="impact" autocomplete="off">
+          </label>
           <label>
             <span>Status</span>
             <select name="status"></select>
@@ -155,6 +186,14 @@ Acceptance criteria:
         <label>
           <span>Checks</span>
           <textarea name="checks" rows="3" placeholder="one per line, e.g. pytest tests/test_store.py"></textarea>
+        </label>
+        <label>
+          <span>Affected Paths</span>
+          <textarea name="affected_paths" rows="3" placeholder="one repo, app, file, or path per line"></textarea>
+        </label>
+        <label>
+          <span>Evidence</span>
+          <textarea name="evidence" rows="3" placeholder="logs, screenshots, reproduction notes, or observed behavior"></textarea>
         </label>
         <label class="checkbox-field">
           <input name="archived" type="checkbox">

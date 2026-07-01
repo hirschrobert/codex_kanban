@@ -29,6 +29,8 @@ const {
   assigneeChipText,
   cardOwnerText,
   cardCreatorText,
+  intakeKindText,
+  intakeSourceText,
   confirmCoordination,
 } = window.Kanban;
 
@@ -39,6 +41,7 @@ const liveStateEl = document.querySelector("#live-state");
 const projectSelectEl = document.querySelector("#project-select");
 const showArchivedToggleEl = document.querySelector("#show-archived-toggle");
 const archiveActionButton = document.querySelector("#archive-action-button");
+const versionTagEl = document.querySelector("#version-tag");
 const cardDialog = document.querySelector("#card-dialog");
 const cardForm = document.querySelector("#card-form");
 const deleteCardButton = document.querySelector("#delete-card-button");
@@ -70,10 +73,26 @@ function render(snapshot) {
   }
   renderProjectSelect();
   showArchivedToggleEl.checked = state.showArchived;
+  renderVersionTag(snapshot.app);
   renderBoard();
   renderArchiveAction();
   renderParticipants();
   renderActivity();
+}
+
+function renderVersionTag(app) {
+  const version = normalText(app?.version);
+  const sourceHash = normalText(app?.hash);
+  if (!version && !sourceHash) {
+    versionTagEl.hidden = true;
+    return;
+  }
+  const dirty = app?.dirty ? "*" : "";
+  versionTagEl.hidden = false;
+  versionTagEl.textContent = `${version ? `v${version}` : "dev"}${sourceHash ? ` ${sourceHash}${dirty}` : ""}`;
+  versionTagEl.title = app?.dirty
+    ? "Codex Kanban build, local changes present"
+    : "Codex Kanban build";
 }
 
 function renderProjectSelect() {
@@ -178,6 +197,9 @@ function renderCard(card) {
   const parentCount = Array.isArray(card.parent_external_ids) ? card.parent_external_ids.length : 0;
   const childCount = Array.isArray(card.child_external_ids) ? card.child_external_ids.length : 0;
   const repeatCadence = normalText(card.repeat_cadence || "none");
+  const intakeKind = intakeKindText(card);
+  const intakeSource = intakeSourceText(card);
+  const affectedCount = Array.isArray(card.affected_paths) ? card.affected_paths.length : 0;
   const stagedArchive = archiveSelection(card);
   const archiveDisabled = state.showArchived && !card.archived;
   const archiveLabel = state.showArchived
@@ -202,6 +224,8 @@ function renderCard(card) {
       ${cardNoticeHtml(card)}
       <div class="card-meta">
         <span class="chip ${priorityClass}">${card.priority}</span>
+        ${intakeKind ? `<span class="chip">${escapeHtml(intakeKind)}</span>` : ""}
+        ${intakeSource ? `<span class="chip">${escapeHtml(intakeSource)}</span>` : ""}
         <span class="chip">Owner: ${escapeHtml(cardOwnerText(card))}</span>
         <span class="chip">Created: ${escapeHtml(cardCreatorText(card))}</span>
         <span class="chip ${card.assignee_is_stale ? "stale-chip" : ""}">Assigned: ${escapeHtml(assigneeChipText(card))}</span>
@@ -209,6 +233,7 @@ function renderCard(card) {
         ${card.archived ? `<span class="chip archived-chip">archived</span>` : ""}
         ${parentCount ? `<span class="chip">${parentCount} parent${parentCount === 1 ? "" : "s"}</span>` : ""}
         ${childCount ? `<span class="chip">${childCount} child${childCount === 1 ? "" : "ren"}</span>` : ""}
+        ${affectedCount ? `<span class="chip">Affected: ${affectedCount}</span>` : ""}
         ${card.target_branch ? `<span class="chip">${escapeHtml(card.target_branch)}</span>` : ""}
         ${card.feature_branch ? `<span class="chip">${escapeHtml(card.feature_branch)}</span>` : ""}
       </div>
@@ -445,6 +470,10 @@ function openCardDialog(card = null) {
   cardForm.elements.id.value = card?.id || "";
   cardForm.elements.title.value = card?.title || "";
   cardForm.elements.description.value = normalizeNewlines(card?.description || "");
+  cardForm.elements.intake_kind.value = card?.intake_kind || "";
+  cardForm.elements.intake_source.value = card ? card?.intake_source || "" : "dashboard";
+  cardForm.elements.reported_by.value = card?.reported_by || "";
+  cardForm.elements.impact.value = card?.impact || "";
   cardForm.elements.status.value = card?.status || "backlog";
   cardForm.elements.priority.value = card?.priority || "normal";
   ensureSelectOption(cardForm.elements.owner_id, card?.owner_id, cardOwnerText(card));
@@ -468,6 +497,10 @@ function openCardDialog(card = null) {
   cardForm.elements.checks.value = Array.isArray(card?.checks)
     ? card.checks.map(normalizeNewlines).join("\n")
     : "";
+  cardForm.elements.affected_paths.value = Array.isArray(card?.affected_paths)
+    ? card.affected_paths.map(normalizeNewlines).join("\n")
+    : "";
+  cardForm.elements.evidence.value = normalizeNewlines(card?.evidence || "");
   cardForm.elements.archived.checked = Boolean(card?.archived);
   renderComments(card);
   const canRunNow = Boolean(card && card.repeat_cadence && card.repeat_cadence !== "none" && !card.archived);
@@ -550,6 +583,7 @@ async function saveCard(event) {
     .split("\n")
     .map((item) => item.trim())
     .filter(Boolean);
+  payload.affected_paths = formList(payload.affected_paths);
   payload.parent_external_ids = formList(payload.parent_external_ids);
   payload.child_external_ids = formList(payload.child_external_ids);
   payload.archived = form.get("archived") === "on";
