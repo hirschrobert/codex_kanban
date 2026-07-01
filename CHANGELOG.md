@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.1.3 - 2026-07-01
+
+This release strengthens release intake guardrails, adds main-agent-first
+request intake metadata, and shows the running dashboard build version/hash.
+
+Public commits:
+
+- `1d2f6f9` hardens release-intake guidance so release work audits included and
+  excluded cards/branches before main is advanced.
+- `8655a9e` requires release-intake audit delegation when a suitable
+  read-only release agent is available.
+- `c71912a` adds structured main-agent intake metadata, optional dashboard
+  intake fields, a runtime dashboard version/hash tag, and focused regression
+  coverage.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Added optional card intake fields for request type, source, reporter, impact,
+  evidence, and affected paths so human feature requests and error reports can
+  move from the main AI agent into durable cards.
+- Kept direct dashboard card entry optional while making main-agent CLI-created
+  cards default to `intake_source=main_agent`.
+- Added compact dashboard build metadata showing package version, git hash, and
+  dirty-tree state from runtime snapshot metadata.
+- Updated Codex Kanban skill/docs to describe main-agent-first request intake
+  and release inclusion/exclusion audit expectations.
+- Added store, CLI, HTTP, static asset, and snapshot regression tests covering
+  the new intake and build metadata paths.
+
+AI disclosure:
+
+This release was developed with help from AI agents using GPT-5, coordinated
+through the Codex Kanban workflow.
+
 ## 0.1.2 - 2026-06-30
 
 This release improves dashboard cleanup, CLI handoff hygiene, and AI-agent
