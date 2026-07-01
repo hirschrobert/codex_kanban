@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.1.4 - 2026-07-01
+
+This release makes dashboard startup failures more human-friendly when the
+requested host/port is already in use.
+
+Public commit:
+
+- `2872c51` handles dashboard port conflicts gracefully by printing a concise
+  Codex Kanban error, including a `kill <pid>` hint when one matching listener
+  process can be identified, preserving tracebacks for unrelated startup
+  errors, and adding regression coverage for ambiguous same-port and dual-stack
+  listener cases.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Replaced the raw Python traceback for occupied dashboard ports with an
+  actionable message that names the host/port and suggests either stopping the
+  existing process or choosing another port.
+- Added Linux `/proc`-based listener PID detection so the message can include a
+  concrete `kill <pid>` command when the matching listener is unambiguous.
+- Kept PID hints conservative for ambiguous listeners and covered same-port
+  different-address plus dual-stack IPv6 wildcard cases.
+- Added focused tests and smoke coverage for the startup error path.
+
+AI disclosure:
+
+This release was developed with help from AI agents using GPT-5, coordinated
+through the Codex Kanban workflow.
+
 ## 0.1.3 - 2026-07-01
 
 This release strengthens release intake guardrails, adds main-agent-first
