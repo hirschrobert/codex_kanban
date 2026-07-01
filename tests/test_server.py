@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import contextlib
+import errno
+import io
 import json
 import tempfile
 import threading
@@ -8,6 +11,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 from kanban_server import server
 from kanban_server.store import KanbanStore
@@ -72,6 +76,91 @@ class ServerDefaultsTest(unittest.TestCase):
     def test_default_port_avoids_common_oauth_callback_port(self) -> None:
         self.assertEqual(server.DEFAULT_PORT, 8766)
         self.assertNotEqual(server.DEFAULT_PORT, 8765)
+
+    def test_main_prints_friendly_message_when_port_is_in_use(self) -> None:
+        stderr = io.StringIO()
+        error = OSError(errno.EADDRINUSE, "Address already in use")
+
+        with mock.patch.object(server, "run_server", side_effect=error):
+            with mock.patch.object(server, "_find_listener_pid", return_value=12345):
+                with contextlib.redirect_stderr(stderr):
+                    exit_code = server.main(["--host", "127.0.0.1", "--port", "8766"])
+
+        message = stderr.getvalue()
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Codex Kanban could not start", message)
+        self.assertIn("127.0.0.1:8766", message)
+        self.assertIn("kill 12345", message)
+        self.assertIn("--port <free-port>", message)
+        self.assertNotIn("Traceback", message)
+
+    def test_main_reraises_unexpected_os_errors(self) -> None:
+        stderr = io.StringIO()
+        error = OSError(errno.EACCES, "Permission denied")
+
+        with mock.patch.object(server, "run_server", side_effect=error):
+            with contextlib.redirect_stderr(stderr):
+                with self.assertRaises(OSError):
+                    server.main(["--host", "127.0.0.1", "--port", "8766"])
+
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_listener_socket_inodes_match_requested_local_address(self) -> None:
+        def listener_row(index: int, address: str, inode: str) -> str:
+            return (
+                f"{index}: {address}:223E 00000000:0000 0A 00000000:00000000 "
+                f"00:00000000 00000000 100 0 {inode} 1"
+            )
+
+        proc_net_tcp = "\n".join(
+            [
+                "header",
+                listener_row(0, "0100007F", "111"),
+                listener_row(1, "0200007F", "222"),
+                listener_row(2, "00000000", "333"),
+            ]
+        )
+
+        def fake_read_text(path: Path, *, encoding: str = "utf-8") -> str:
+            del encoding
+            if str(path) == "/proc/net/tcp":
+                return proc_net_tcp
+            raise FileNotFoundError(path)
+
+        with mock.patch.object(Path, "read_text", fake_read_text):
+            self.assertEqual(server._listener_socket_inodes("127.0.0.1", 8766), {"111", "333"})
+            self.assertEqual(server._listener_socket_inodes("127.0.0.2", 8766), {"222", "333"})
+
+    def test_listener_socket_inodes_include_dual_stack_ipv6_wildcard(self) -> None:
+        wildcard = "00000000000000000000000000000000"
+        proc_net_tcp6 = "\n".join(
+            [
+                "header",
+                (
+                    f"0: {wildcard}:223E {wildcard}:0000 "
+                    "0A 00000000:00000000 00:00000000 00000000 100 0 444 1"
+                ),
+            ]
+        )
+
+        def fake_read_text(path: Path, *, encoding: str = "utf-8") -> str:
+            del encoding
+            path_text = str(path)
+            if path_text == "/proc/net/tcp":
+                return "header"
+            if path_text == "/proc/net/tcp6":
+                return proc_net_tcp6
+            if path_text == "/proc/sys/net/ipv6/bindv6only":
+                return "0\n"
+            raise FileNotFoundError(path)
+
+        with mock.patch.object(Path, "read_text", fake_read_text):
+            self.assertEqual(server._listener_socket_inodes("127.0.0.1", 8766), {"444"})
+
+    def test_find_listener_pid_suppresses_ambiguous_matches(self) -> None:
+        with mock.patch.object(server, "_listener_socket_inodes", return_value={"111", "222"}):
+            with mock.patch.object(server, "_pids_for_socket_inodes", return_value={123, 456}):
+                self.assertIsNone(server._find_listener_pid("127.0.0.1", 8766))
 
     def test_static_assets_are_not_cached(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import errno
+import ipaddress
 import json
 import mimetypes
 import os
 import queue
+import socket
 import sys
 import threading
 from http import HTTPStatus
@@ -20,6 +23,159 @@ from .store.support import DEFAULT_DB_PATH
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8766
+IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
+
+
+def _is_address_in_use_error(exc: OSError) -> bool:
+    return exc.errno == errno.EADDRINUSE
+
+
+def _host_addresses(host: str) -> set[IPAddress]:
+    try:
+        results = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        return set()
+    addresses: set[IPAddress] = set()
+    for result in results:
+        try:
+            addresses.add(ipaddress.ip_address(result[4][0]))
+        except ValueError:
+            continue
+    return addresses
+
+
+def _proc_net_tcp_address(hex_address: str, *, ipv6: bool) -> IPAddress | None:
+    try:
+        raw_address = bytes.fromhex(hex_address)
+    except ValueError:
+        return None
+    try:
+        if ipv6:
+            if len(raw_address) != 16:
+                return None
+            network_order = b"".join(
+                raw_address[index : index + 4][::-1] for index in range(0, 16, 4)
+            )
+            return ipaddress.IPv6Address(network_order)
+        if len(raw_address) != 4:
+            return None
+        return ipaddress.IPv4Address(raw_address[::-1])
+    except ValueError:
+        return None
+
+
+def _ipv6_wildcard_can_block_ipv4() -> bool:
+    try:
+        return Path("/proc/sys/net/ipv6/bindv6only").read_text(encoding="utf-8").strip() == "0"
+    except OSError:
+        return False
+
+
+def _listener_address_matches(
+    listener_address: IPAddress,
+    requested: set[IPAddress],
+    *,
+    ipv6_wildcard_blocks_ipv4: bool,
+) -> bool:
+    if not requested:
+        return False
+    if listener_address.is_unspecified:
+        if any(address.version == listener_address.version for address in requested):
+            return True
+        return (
+            ipv6_wildcard_blocks_ipv4
+            and listener_address.version == 6
+            and any(address.version == 4 for address in requested)
+        )
+    if any(
+        address.is_unspecified and address.version == listener_address.version
+        for address in requested
+    ):
+        return True
+    return listener_address in requested
+
+
+def _listener_socket_inodes(host: str, port: int) -> set[str]:
+    requested_addresses = _host_addresses(host)
+    ipv6_wildcard_blocks_ipv4 = _ipv6_wildcard_can_block_ipv4()
+    inodes: set[str] = set()
+    for proc_net_path, ipv6 in (
+        (Path("/proc/net/tcp"), False),
+        (Path("/proc/net/tcp6"), True),
+    ):
+        try:
+            lines = proc_net_path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        for line in lines[1:]:
+            fields = line.split()
+            if len(fields) < 10 or fields[3] != "0A":
+                continue
+            try:
+                hex_address, hex_port = fields[1].rsplit(":", 1)
+                local_port = int(hex_port, 16)
+            except ValueError:
+                continue
+            local_address = _proc_net_tcp_address(hex_address, ipv6=ipv6)
+            if (
+                local_port == port
+                and local_address
+                and _listener_address_matches(
+                    local_address,
+                    requested_addresses,
+                    ipv6_wildcard_blocks_ipv4=ipv6_wildcard_blocks_ipv4,
+                )
+            ):
+                inodes.add(fields[9])
+    return inodes
+
+
+def _pids_for_socket_inodes(inodes: set[str]) -> set[int]:
+    if not inodes:
+        return set()
+    try:
+        pid_dirs = sorted(
+            (path for path in Path("/proc").iterdir() if path.name.isdecimal()),
+            key=lambda path: int(path.name),
+        )
+    except OSError:
+        return set()
+
+    pids: set[int] = set()
+    for pid_dir in pid_dirs:
+        try:
+            fd_paths = list((pid_dir / "fd").iterdir())
+        except OSError:
+            continue
+        for fd_path in fd_paths:
+            try:
+                target = os.readlink(fd_path)
+            except OSError:
+                continue
+            if (
+                target.startswith("socket:[")
+                and target.removeprefix("socket:[").removesuffix("]") in inodes
+            ):
+                pids.add(int(pid_dir.name))
+                break
+    return pids
+
+
+def _find_listener_pid(host: str, port: int) -> int | None:
+    pids = _pids_for_socket_inodes(_listener_socket_inodes(host, port))
+    return next(iter(pids)) if len(pids) == 1 else None
+
+
+def _address_in_use_message(host: str, port: int, pid: int | None) -> str:
+    stop_hint = (
+        f"Stop the process using that port with `kill {pid}`, or start this one on another port"
+        if pid is not None
+        else "Stop the existing dashboard process, or start this one on another port"
+    )
+    return (
+        f"Codex Kanban could not start because {host}:{port} is already in use.\n"
+        f"{stop_hint} with `python3 -m kanban_server --port <free-port>`."
+    )
 
 
 class EventBroker:
@@ -656,5 +812,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
     args = parser.parse_args(argv)
-    run_server(args.host, args.port, args.db)
+    try:
+        run_server(args.host, args.port, args.db)
+    except OSError as exc:
+        if not _is_address_in_use_error(exc):
+            raise
+        print(
+            _address_in_use_message(args.host, args.port, _find_listener_pid(args.host, args.port)),
+            file=sys.stderr,
+        )
+        return 1
     return 0
