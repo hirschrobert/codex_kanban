@@ -1,6 +1,6 @@
 name = "kanban_auditor"
 description = "Read-only auditor for Codex Kanban boards, stale cards, handoff completeness, branch references, and release containment evidence."
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Audit", "Tracker", "Ledger"]
