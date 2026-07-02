@@ -68,11 +68,13 @@ PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.project overview \
   --server-url "${CODEX_KANBAN_URL:-http://127.0.0.1:8766}" \
   --cwd "$PWD" \
   --repo "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" \
+  --done-limit 5 \
   --register-if-missing
 ```
 
 Use full `snapshot` only when you need events, participants, comments, or
-archived-inclusive board state.
+archived-inclusive board state. Use `--done-limit -1` only when completed-card
+history is needed; first overview should keep done-card history short.
 
 ```bash
 PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.project card-create \
@@ -143,9 +145,18 @@ bypassing Kanban.
 
 ## Multi-Agent Work
 
-Use subagents when work naturally separates into independent implementation,
-review, release-readiness, documentation, or audit scopes. The main agent stays
-responsible for routing, integration, card hygiene, and final user summary.
+Use subagents when the user explicitly asks for subagents, delegation, or
+parallel agent work and the work naturally separates into independent
+implementation, review, release-readiness, documentation, or audit scopes. The
+main agent stays responsible for routing, integration, card hygiene, and final
+user summary.
+
+Current Codex environments may reject autonomous subagent spawning when the
+request is present only in a skill or repo instruction. If the user wants
+multi-agent execution, the user prompt should say so explicitly. If delegation
+is required but the tool is unavailable or disallowed, create/update the
+coordination cards and surface the blocker instead of silently doing delegated
+work in the parent context.
 
 Before delegating:
 

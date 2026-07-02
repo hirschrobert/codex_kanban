@@ -97,6 +97,75 @@ class ProjectCliOverviewTest(unittest.TestCase):
         self.assertIn("archived", overview["archived_notice"])
         self.assertEqual([card["id"] for card in archived_snapshot["cards"]], [archived["id"]])
 
+    def test_overview_done_limit_flag_controls_completed_cards(self) -> None:
+        db_path = self.make_db_path()
+        store = KanbanStore(db_path)
+        project_record = store.register_project(
+            {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "card_prefix": "DM",
+                "root_path": "/workspace/demo",
+            }
+        )
+        active = store.create_card(
+            {
+                "board_slug": project_record["board_slug"],
+                "title": "Active startup card",
+                "description": "Active card.",
+                "status": "in_progress",
+            }
+        )
+        done_cards = [
+            store.create_card(
+                {
+                    "board_slug": project_record["board_slug"],
+                    "title": f"Done card {index}",
+                    "description": "Done card.",
+                    "status": "done",
+                }
+            )
+            for index in range(6)
+        ]
+
+        overview = json.loads(
+            self.capture_project_main(
+                [
+                    "overview",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                ]
+            )
+        )
+        all_done = json.loads(
+            self.capture_project_main(
+                [
+                    "overview",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--done-limit",
+                    "-1",
+                ]
+            )
+        )
+
+        self.assertEqual(overview["done_card_count"], 6)
+        self.assertEqual(overview["done_cards_hidden_count"], 1)
+        self.assertIn(active["id"], [card["id"] for card in overview["cards"]])
+        self.assertEqual(
+            [card["id"] for card in overview["cards"] if card["status"] == "done"],
+            [card["id"] for card in reversed(done_cards[-5:])],
+        )
+        self.assertEqual(
+            [card["id"] for card in all_done["cards"] if card["status"] == "done"],
+            [card["id"] for card in reversed(done_cards)],
+        )
+
     def test_overview_can_auto_register_single_repo_with_kanban_instructions(self) -> None:
         db_path = self.make_db_path()
         repo = self.make_git_repo("demo")

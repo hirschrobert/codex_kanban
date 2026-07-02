@@ -172,6 +172,56 @@ class KanbanStoreProjectCoordinationTest(unittest.TestCase):
         self.assertEqual([card["id"] for card in archived_only["cards"]], [archived["id"]])
         self.assertFalse(archived_only["archived_cards_hidden"])
 
+    def test_overview_limits_done_cards_by_default(self) -> None:
+        store = self.make_store()
+        self.register_demo_project(store)
+        active = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Active card",
+                "description": "Active cards remain visible.",
+                "status": "in_progress",
+            }
+        )
+        done_cards = [
+            store.create_card(
+                {
+                    "board_slug": "demo",
+                    "title": f"Done card {index}",
+                    "description": f"Completed work {index}.",
+                    "status": "done",
+                }
+            )
+            for index in range(7)
+        ]
+
+        overview = store.overview("demo")
+        overview_ids = [card["id"] for card in overview["cards"]]
+
+        self.assertIn(active["id"], overview_ids)
+        self.assertEqual(overview["done_limit"], 5)
+        self.assertEqual(overview["done_card_count"], 7)
+        self.assertEqual(overview["done_cards_hidden_count"], 2)
+        self.assertTrue(overview["done_cards_hidden"])
+        self.assertEqual(
+            [card["id"] for card in overview["cards"] if card["status"] == "done"],
+            [card["id"] for card in reversed(done_cards[-5:])],
+        )
+
+        without_done = store.overview("demo", done_limit=0)
+        self.assertEqual(
+            [card["id"] for card in without_done["cards"]],
+            [active["id"]],
+        )
+        self.assertEqual(without_done["done_cards_hidden_count"], 7)
+
+        all_done = store.overview("demo", done_limit=-1)
+        self.assertEqual(
+            [card["id"] for card in all_done["cards"] if card["status"] == "done"],
+            [card["id"] for card in reversed(done_cards)],
+        )
+        self.assertEqual(all_done["done_cards_hidden_count"], 0)
+
     def test_overview_reports_ambiguous_workspace_matches(self) -> None:
         store = self.make_store()
         store.register_project(

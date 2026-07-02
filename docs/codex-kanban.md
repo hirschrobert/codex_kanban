@@ -58,13 +58,16 @@ python3 -m kanban_server.project overview \
   --server-url http://127.0.0.1:8766 \
   --cwd "$PWD" \
   --repo "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" \
+  --done-limit 5 \
   --register-if-missing
 ```
 
 The overview resolves the current repo or ecosystem path to the registered
-board, lists non-archived cards with descriptions, includes affected registered
-project paths, and reports how many archived cards exist. Use
-`--archived-only` when older context may matter. `--register-if-missing` only
+board, lists all non-done non-archived cards with descriptions, includes only
+the latest five done cards by default, includes affected registered project
+paths, and reports how many archived and done cards are hidden. Use
+`--done-limit -1` when completed-card history matters, and use `--archived-only`
+when older archived context may matter. `--register-if-missing` only
 auto-registers a single repo whose `AGENTS.md` opts into `codex-kanban`;
 ecosystems still need explicit repeated `--path` and `--instruction` values.
 
@@ -307,6 +310,7 @@ python3 -m kanban_server.project overview \
   --server-url http://127.0.0.1:8766 \
   --cwd "$PWD" \
   --repo "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" \
+  --done-limit 5 \
   --register-if-missing
 ```
 
@@ -580,6 +584,14 @@ Participating AI agents should:
   failures, changed assumptions, and follow-up cards in handoffs;
 - read the concrete project `AGENTS.md` files registered for the selected
   project.
+
+Current Codex subagent tooling may require the user prompt itself to explicitly
+ask for subagents, delegation, or parallel agent work; a skill or repo
+instruction alone may not be enough. This behavior is tracked in
+<https://github.com/openai/codex/issues/18994>. When a workflow needs
+subagents but the active Codex environment disallows spawning, record the
+coordination cards and surface the blocker instead of doing delegated work
+silently in the parent context.
 
 ## Abstract Agent Profiles
 

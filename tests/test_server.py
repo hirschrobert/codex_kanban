@@ -721,6 +721,56 @@ class ServerDefaultsTest(unittest.TestCase):
 
             self.assertEqual([card["id"] for card in archived_only["cards"]], [archived["id"]])
 
+    def test_overview_done_limit_query_controls_completed_cards(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = KanbanStore(Path(tmp) / "kanban.sqlite3")
+            project = store.register_project(
+                {
+                    "slug": "demo",
+                    "display_name": "Demo",
+                    "board_slug": "demo",
+                    "card_prefix": "DM",
+                    "root_path": "/workspace",
+                }
+            )
+            active = store.create_card(
+                {
+                    "board_slug": project["board_slug"],
+                    "title": "Active overview card",
+                    "description": "Active card.",
+                    "status": "in_progress",
+                }
+            )
+            done_cards = [
+                store.create_card(
+                    {
+                        "board_slug": project["board_slug"],
+                        "title": f"Done card {index}",
+                        "description": "Done card.",
+                        "status": "done",
+                    }
+                )
+                for index in range(4)
+            ]
+            httpd = self.start_server(store)
+
+            with urllib.request.urlopen(
+                (
+                    f"http://127.0.0.1:{httpd.server_address[1]}"
+                    "/api/overview?board=demo&done_limit=2"
+                ),
+                timeout=3,
+            ) as response:
+                overview = json.loads(response.read().decode("utf-8"))
+
+            self.assertEqual(overview["done_card_count"], 4)
+            self.assertEqual(overview["done_cards_hidden_count"], 2)
+            self.assertIn(active["id"], [card["id"] for card in overview["cards"]])
+            self.assertEqual(
+                [card["id"] for card in overview["cards"] if card["status"] == "done"],
+                [card["id"] for card in reversed(done_cards[-2:])],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
