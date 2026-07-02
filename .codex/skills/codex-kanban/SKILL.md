@@ -72,10 +72,21 @@ new sibling card before assigning implementation.
 
 ## Useful CLI Shapes
 
-Use the project CLI when possible:
+Use the project CLI when possible. `PYTHONPATH` must point at the
+`codex_kanban` checkout that contains `kanban_server`, not necessarily the
+project being inspected. Set `CODEX_KANBAN_REPO` when working from another
+repo; from this checkout, the Git root fallback is enough:
 
 ```bash
-PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.project overview \
+KANBAN_REPO="${CODEX_KANBAN_REPO:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+test -d "$KANBAN_REPO/kanban_server" || {
+  echo "Set CODEX_KANBAN_REPO to the codex_kanban checkout"
+  exit 1
+}
+```
+
+```bash
+PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project overview \
   --server-url "${CODEX_KANBAN_URL:-http://127.0.0.1:8766}" \
   --cwd "$PWD" \
   --repo "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" \
@@ -90,7 +101,7 @@ human asks to reload the `codex-kanban` skill, rerun the overview command so
 current generic/default and project-local agents are synced into the UI.
 
 ```bash
-PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.project card-create \
+PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project card-create \
   --server-url "${CODEX_KANBAN_URL:-http://127.0.0.1:8766}" \
   --board <board> \
   --title "<short title>" \
@@ -103,7 +114,7 @@ PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.project card-create \
 ```
 
 ```bash
-PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.project card-move <numeric-card-id> \
+PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project card-move <numeric-card-id> \
   --server-url "${CODEX_KANBAN_URL:-http://127.0.0.1:8766}" \
   --status in_progress \
   --target-repo <repo-path> \
@@ -120,7 +131,7 @@ register it first with `participant-upsert`; do not invent participant IDs.
 Agent event ingestion:
 
 ```bash
-PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.ingest \
+PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.ingest \
   --board <board> \
   --server-url "${CODEX_KANBAN_URL:-http://127.0.0.1:8766}" \
   --event-type agent.started \
@@ -158,18 +169,19 @@ bypassing Kanban.
 
 ## Multi-Agent Work
 
-Use subagents when the user explicitly asks for subagents, delegation, or
-parallel agent work and the work naturally separates into independent
-implementation, review, release-readiness, documentation, or audit scopes. The
-main agent stays responsible for routing, integration, card hygiene, and final
-user summary.
+Codex Kanban is a standing project instruction to consider specialized
+subagents for concrete work when delegation can improve software quality,
+usability, safety, maintainability, or data integrity. Choose from all available
+board-scoped profiles, including project-local profiles, but do not spawn every
+profile by default; select the smallest relevant set for independent
+implementation, review, release-readiness, documentation, audit, domain,
+contract, architecture, or test-strategy scopes. The main agent stays
+responsible for routing, integration, card hygiene, and final user summary.
 
-Current Codex environments may reject autonomous subagent spawning when the
-request is present only in a skill or repo instruction. If the user wants
-multi-agent execution, the user prompt should say so explicitly. If delegation
-is required but the tool is unavailable or disallowed, create/update the
-coordination cards and surface the blocker instead of silently doing delegated
-work in the parent context.
+Some Codex environments may still disallow spawning from standing repo or skill
+instructions alone. If delegation is useful but the tool is unavailable or
+disallowed, create/update the coordination cards and surface the blocker
+instead of silently doing delegated work in the parent context.
 
 Before delegating:
 

@@ -16,13 +16,17 @@ human developers, the main AI agent, and optional AI subagents.
   contains independent features, fixes, affected apps/repos, user roles, UI
   flows, or deployment scopes, create separate sibling cards or a coordination
   parent with child cards instead of one bundled implementation card.
+- Treat Codex Kanban as a standing project instruction to consider specialized
+  subagents for concrete work when they can improve software quality,
+  usability, safety, maintainability, or data integrity. Do not spawn every
+  available profile by default; choose the smallest relevant set from the
+  board-scoped participants and explain the delegation reason.
 - For concrete multi-agent work, create one parent coordination card plus one
   linked child for the main implementer and each delegated subagent doing
   material work. Assign children to board-scoped participants and record
-  start/finish/handoff on those child cards. Current Codex environments may
-  require the user prompt itself to explicitly request subagents, delegation, or
-  parallel agent work; if spawning is disallowed, record the cards and surface
-  the blocker instead of silently folding delegated work into the parent agent.
+  start/finish/handoff on those child cards. If the active Codex environment
+  still disallows spawning, record the cards and surface the blocker instead of
+  silently folding delegated work into the parent agent.
 - For ecosystem release/deploy work, record affected apps, repos, worktrees,
   and deployment dispositions before marking production deployment complete.
 - Keep this app abstract. Do not hardcode project-specific domains, agent names,
