@@ -222,10 +222,18 @@ Public release rules that must remain explicit:
   it;
 - audit tracked files and intended push refs for personal data, local paths,
   local databases, secrets, and generated coordination state;
-- push explicit release branches/tags only, never `--mirror` or `--all` from a
+- push only explicit release branches, the approved `main` release-merge
+  fast-forward ref, or release tags; never `--mirror` or `--all` from a
   development repo;
-- advance `main` only by fast-forwarding it to the exact release commit SHA
-  that passed release-branch CI.
+- keep feature, fix, and release metadata commits on `release/<version>`;
+- integrate a release with an explicit no-fast-forward merge commit whose first
+  parent is the previous `main` and whose second parent is the release branch
+  tip;
+- push that merge commit back to `release/<version>` and wait for CI on that
+  exact SHA before advancing `main`;
+- advance `main` only by fast-forwarding it to the exact release merge commit
+  SHA that passed release-branch CI; never squash, rebase, rewrite, or create
+  an untested main-only commit.
 
 ## Final Response
 

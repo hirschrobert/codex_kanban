@@ -17,13 +17,34 @@ Before pushing refs or tags, record the release scope on the Kanban release
 card: included/excluded cards and branches, affected apps/repos/worktrees, and
 deployment dispositions for anything production-facing.
 
-Push only the intended release branch or tag, then fast-forward `main` to the
-same commit SHA after release-branch CI passes:
+Push only explicit release refs, the approved `main` release-merge
+fast-forward ref, and release tags. Feature, fix, and release metadata commits
+stay on `release/<version>`. After release-branch CI passes on the release tip,
+create a visible no-fast-forward release merge commit from the current public
+`main` and the release branch, then run CI on that exact merge commit before
+`main` moves:
 
 ```bash
-git push origin refs/heads/release/0.1.3:refs/heads/release/0.1.3
-git push origin refs/heads/release/0.1.3:refs/heads/main
-git push origin refs/tags/v0.1.3:refs/tags/v0.1.3
+version=0.1.6
+release_branch="release/${version}"
+
+git push origin "refs/heads/${release_branch}:refs/heads/${release_branch}"
+# Wait for CI to pass on the release branch tip.
+
+git fetch origin main "${release_branch}"
+git switch --detach origin/main
+git merge --no-ff --no-edit "origin/${release_branch}"
+merge_sha="$(git rev-parse HEAD)"
+
+git branch -f "${release_branch}" "${merge_sha}"
+git push origin "${merge_sha}:refs/heads/${release_branch}"
+# Wait for CI to pass on release/<version> at ${merge_sha}.
+
+git push origin "${merge_sha}:refs/heads/main"
+git tag -a "v${version}" "${merge_sha}" -m "Release ${version}"
+git push origin "refs/tags/v${version}:refs/tags/v${version}"
+git branch -f main "${merge_sha}"
+git switch main
 ```
 
 Do not use `git push --mirror` or `git push --all` from a working repository
@@ -31,10 +52,15 @@ that may contain development-only refs. If a clean public export is needed,
 clone only the intended branch into a fresh directory and push from that clone.
 
 The repository protects `main` with the `test` status check. Because full CI
-runs on `release/**` and not on `main` pushes, `main` should accept only a
-commit SHA that already passed release-branch CI. A merge commit, squash commit,
-or rebased main-only SHA will not have the release-branch check attached and
-should be rejected.
+runs on `release/**` and not on `main` pushes, `main` should accept only the
+release merge commit SHA that already passed release-branch CI. A squash
+commit, rebased commit, rewritten commit, or other main-only SHA will not have
+the release-branch check attached and should be rejected.
+
+The release merge commit gives developers a clear first-parent marker on
+`main`, while the second parent keeps the feature/fix/release metadata commits
+visibly grouped on the release branch. Do not rewrite already-published history
+to retrofit this shape; apply it to future releases.
 
 ## Git Identity
 
