@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.1.7 - 2026-07-02
+
+This release simplifies the documented release integration gate so CI runs once
+on the exact merge commit that will advance `main`.
+
+Public commit:
+
+- `a48a7dc` clarifies that agents should create the
+  no-fast-forward release merge commit before the first public push for a
+  release, push that merge SHA to `release/<version>`, wait for CI there, and
+  only then fast-forward `main`.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Avoided the earlier two-run pattern of testing the pre-merge release tip and
+  then testing the release merge commit.
+- Documented a no-`gh` CI polling option using `curl` and Python's standard
+  library, while keeping GitHub's web UI as a valid manual check.
+- Kept the visible release branch and explicit merge commit history shape from
+  0.1.6.
+
+AI disclosure:
+
+This release was developed with help from AI agents using GPT-5.5, coordinated
+through the Codex Kanban workflow.
+
 ## 0.1.6 - 2026-07-02
 
 This release documents and validates a clearer release-branch integration flow
