@@ -35,12 +35,24 @@ Override it with:
 CODEX_KANBAN_DB=/path/to/kanban.sqlite3 python3 -m kanban_server
 ```
 
+When running CLI examples from a source checkout, set `KANBAN_REPO` to the
+checkout that contains `kanban_server`. From inside this repository the Git root
+fallback is enough; from another project, set `CODEX_KANBAN_REPO` first:
+
+```bash
+KANBAN_REPO="${CODEX_KANBAN_REPO:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+test -d "$KANBAN_REPO/kanban_server" || {
+  echo "Set CODEX_KANBAN_REPO to the codex_kanban checkout"
+  exit 1
+}
+```
+
 ## Clean Local Database
 
 Reset the SQLite database while preserving the schema:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project reset --yes
 ```
 
@@ -53,7 +65,7 @@ Agents should start with the lean workspace overview instead of a full board
 snapshot:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project overview \
   --server-url http://127.0.0.1:8766 \
   --cwd "$PWD" \
@@ -247,7 +259,7 @@ cross-project parallelism; Kanban owns the project guardrails.
 Projects register a board plus concrete instruction paths:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project register \
   --server-url http://127.0.0.1:8766 \
   --root /path/to/my-project \
@@ -268,7 +280,7 @@ auto-registers a minimal project entry from the repo root, name, and
 For ecosystems, repeat `--path` and `--instruction`:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project register \
   --server-url http://127.0.0.1:8766 \
   --root /workspace/main-repo \
@@ -284,7 +296,7 @@ python3 -m kanban_server.project register \
 To generate a prompt/command for a new project's main AI agent:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project prompt \
   --root /path/to/my-project \
   --display-name "My Project" \
@@ -298,6 +310,11 @@ Put this durable instruction in a new project's `AGENTS.md`:
 
 - Use the `codex-kanban` skill for concrete feature, fix, docs, test, review,
   release, registration, or multi-agent work in this repository.
+- Treat Codex Kanban as a standing instruction to consider specialized
+  subagents when they can improve software quality, usability, safety,
+  maintainability, or data integrity. Choose relevant specialists from all
+  available board-scoped profiles, including project-local profiles, instead of
+  spawning every profile by default.
 - Do not create Kanban cards or workflow updates for trivial local operations,
   quick command checks, or discussion that does not change project work.
 - For exploratory feature discussion, Kanban is optional and should stay light:
@@ -311,13 +328,13 @@ Agents should prefer the CLI over raw HTTP when they need to inspect or update
 the board:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project list \
   --server-url http://127.0.0.1:8766
 ```
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project overview \
   --server-url http://127.0.0.1:8766 \
   --cwd "$PWD" \
@@ -332,7 +349,7 @@ archived-inclusive board view.
 Create a human-readable card with concrete context:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project card-create \
   --server-url http://127.0.0.1:8766 \
   --board my-project \
@@ -349,7 +366,7 @@ When the main AI agent receives a human feature request or error report, add
 intake metadata while creating the card:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project card-create \
   --server-url http://127.0.0.1:8766 \
   --board my-project \
@@ -376,7 +393,7 @@ when the local human developer is the creator.
 Move or hand off a card:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project card-move 1 \
   --server-url http://127.0.0.1:8766 \
   --status in_progress \
@@ -396,7 +413,7 @@ omitting `--blocker` leaves existing blocker text unchanged.
 Link dependency cards from the CLI:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project card-create \
   --server-url http://127.0.0.1:8766 \
   --board my-project \
@@ -425,7 +442,7 @@ To list due ready workflow cards and the `codex exec` command that would run
 them:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project due-run \
   --server-url http://127.0.0.1:8766 \
   --board my-project
@@ -434,7 +451,7 @@ python3 -m kanban_server.project due-run \
 To execute them from a trusted shell or OS cron, add `--execute`:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project due-run \
   --server-url http://127.0.0.1:8766 \
   --board my-project \
@@ -458,7 +475,7 @@ Without `--execute` it is a dry run.
 Require the current release branch explicitly:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project workflow-start \
   --server-url http://127.0.0.1:8766 \
   --board my-project \
@@ -497,7 +514,7 @@ If a card assignment fails because the assignee is unknown, choose an existing
 participant from the snapshot or register the participant first:
 
 ```bash
-PYTHONPATH="$(pwd)" \
+PYTHONPATH="$KANBAN_REPO" \
 python3 -m kanban_server.project participant-upsert \
   --server-url http://127.0.0.1:8766 \
   --board my-project \
@@ -580,6 +597,11 @@ Participating AI agents should:
 - split multi-intent human requests into separate cards before implementation:
   one feature plus one fix, different affected apps, different user roles, or
   independent deployment scopes should not share one implementation card;
+- treat Codex Kanban as a standing instruction to consider specialized
+  subagents for concrete work when they can improve software quality,
+  usability, safety, maintainability, or data integrity. Choose the smallest
+  useful set from all available board-scoped profiles, including project-local
+  profiles, instead of spawning every profile by default;
 - start review automatically after implementation cards complete when a
   delegation mechanism is available. The implementation agent should not leave a
   reviewer card merely `ready` unless no reviewer can be started;
@@ -597,11 +619,10 @@ Participating AI agents should:
 - read the concrete project `AGENTS.md` files registered for the selected
   project.
 
-Current Codex subagent tooling may require the user prompt itself to explicitly
-ask for subagents, delegation, or parallel agent work; a skill or repo
-instruction alone may not be enough. This behavior is tracked in
-<https://github.com/openai/codex/issues/18994>. When a workflow needs
-subagents but the active Codex environment disallows spawning, record the
+Some Codex subagent tooling may still reject spawning from standing repo or
+skill instructions alone. This behavior is tracked in
+<https://github.com/openai/codex/issues/18994>. When a workflow would benefit
+from subagents but the active Codex environment disallows spawning, record the
 coordination cards and surface the blocker instead of doing delegated work
 silently in the parent context.
 
@@ -667,7 +688,7 @@ A project-local hook can be based on this shape after review/trust:
         "hooks": [
           {
             "type": "command",
-            "command": "CODEX_KANBAN_URL=http://127.0.0.1:8766 PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.hook"
+            "command": "test -d \"${CODEX_KANBAN_REPO:?Set CODEX_KANBAN_REPO to the codex_kanban checkout}/kanban_server\" && CODEX_KANBAN_URL=http://127.0.0.1:8766 PYTHONPATH=\"$CODEX_KANBAN_REPO\" python3 -m kanban_server.hook"
           }
         ]
       }

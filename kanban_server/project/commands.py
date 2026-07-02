@@ -273,7 +273,13 @@ def print_prompt(args: argparse.Namespace) -> int:
 
 Run from a trusted shell:
 
-PYTHONPATH={CODEX_KANBAN_REPO_ROOT} python3 -m kanban_server.project register \\
+KANBAN_REPO="${{CODEX_KANBAN_REPO:-{CODEX_KANBAN_REPO_ROOT}}}"
+test -d "$KANBAN_REPO/kanban_server" || {{
+  echo "Set CODEX_KANBAN_REPO to the codex_kanban checkout"
+  exit 1
+}}
+
+PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project register \\
   --server-url http://127.0.0.1:8766 \\
   --root {root} \\
   --slug {slug} \\
@@ -282,10 +288,15 @@ PYTHONPATH={CODEX_KANBAN_REPO_ROOT} python3 -m kanban_server.project register \\
 
 After registration, use board `{slug}` as the shared orchestration surface.
 Use the `codex-kanban` skill to respect human-added cards, work only on the
-assigned card/scope, and delegate to the reusable agent profiles: {profiles}.
+assigned card/scope, and treat Codex Kanban as a standing project instruction
+to consider specialized subagents for concrete work when they can improve
+software quality, usability, safety, maintainability, or data integrity. Choose
+the smallest relevant set from all available board-scoped profiles, including
+project-local profiles: {profiles}. Do not spawn every profile by default.
+
 For first overview, run:
 
-PYTHONPATH={CODEX_KANBAN_REPO_ROOT} python3 -m kanban_server.project overview \\
+PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project overview \\
   --server-url http://127.0.0.1:8766 \\
   --cwd {root} \\
   --repo {root} \\
@@ -302,9 +313,9 @@ Split multi-intent human requests before implementation: independent features,
 fixes, affected apps/repos, user roles, UI flows, or deployment scopes should
 be separate sibling cards or child cards under a coordination parent, not one
 bundled implementation card.
-When asking Codex to use subagents, include an explicit user request for
-subagents, delegation, or parallel agent work. Current Codex environments may
-not treat skill or repo text alone as authorization to spawn subagents.
+If a Codex environment still disallows spawning from standing project
+instructions alone, record the intended delegation cards and surface the blocker
+instead of silently doing delegated work in the parent context.
 
 Concrete project rules stay in this repo's AGENTS.md; do not copy domain rules
 into the global Kanban app.
