@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.1.9 - 2026-07-02
+
+This release makes Kanban startup and delegation guidance harder to misapply in
+fresh Codex sessions.
+
+Public commit:
+
+- `6a9b33c` makes CLI examples derive and validate the `codex_kanban`
+  checkout before setting `PYTHONPATH`, and changes Kanban guidance into a
+  standing instruction to choose relevant specialized subagents when they can
+  improve software quality, usability, safety, maintainability, or data
+  integrity.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Added `KANBAN_REPO` guidance so agents do not copy stale absolute checkout
+  paths when running the Kanban project CLI from another repository.
+- Updated the skill, root instructions, docs, and generated project prompt so
+  Codex Kanban is a standing instruction to consider all available
+  board-scoped specialists, including project-local profiles, without spawning
+  every profile by default.
+- Added prompt regression coverage for the safer import path and standing
+  delegation wording.
+
+AI disclosure:
+
+This release was developed, reviewed, and prepared with help from AI agents
+using GPT-5.5, coordinated through the Codex Kanban workflow.
+
 ## 0.1.8 - 2026-07-02
 
 This release tightens agent startup coordination, reduces first-overview noise,
