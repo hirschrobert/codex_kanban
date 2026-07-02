@@ -250,6 +250,23 @@ window.Kanban = window.Kanban || {};
     return titleCaseToken(card?.intake_source);
   }
 
+  function affectedProjectPathText(item) {
+    if (!item || typeof item !== "object") return text(item);
+    const label = normalText(item.label);
+    const path = normalText(item.path);
+    return label && path ? `${label}: ${path}` : label || path;
+  }
+
+  function deploymentDispositionText(item) {
+    if (!item || typeof item !== "object") return text(item);
+    const label = normalText(item.label);
+    const path = normalText(item.path);
+    const status = normalText(item.status) || "pending";
+    const note = normalText(item.note);
+    const target = label && path ? `${label}|${path}` : label || path;
+    return `${target}=${status}${note ? `:${note}` : ""}`;
+  }
+
   function confirmCoordination(card) {
     if (!activeConflictStatuses.has(card?.status)) return true;
     const conflicts = potentialConflicts(card);
@@ -298,6 +315,8 @@ window.Kanban = window.Kanban || {};
     cardCreatorText,
     intakeKindText,
     intakeSourceText,
+    affectedProjectPathText,
+    deploymentDispositionText,
     confirmCoordination,
   });
 }

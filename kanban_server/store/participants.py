@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import sqlite3
 from typing import TYPE_CHECKING, Any
 
 from .support import (
+    PARTICIPANT_KINDS,
     _json_dumps,
+    _normalise_comment_author_name,
     _normalise_metadata,
     slugify,
     utc_now,
@@ -133,6 +136,21 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
                     action="create event",
                 )
             now = utc_now()
+            message = self._clean_text(payload.get("message")) or ""
+            metadata = _normalise_metadata(payload.get("metadata"))
+            if not metadata.get("comment_id"):
+                comment_id = self._agent_feedback_comment_id(
+                    conn,
+                    event_type=event_type,
+                    board_slug=board_slug,
+                    card_id=card_id,
+                    participant_id=participant_id,
+                    message=message,
+                    metadata=metadata,
+                    created_at=now,
+                )
+                if comment_id is not None:
+                    metadata["comment_id"] = comment_id
             cursor = conn.execute(
                 """
                 INSERT INTO events (
@@ -147,8 +165,8 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
                     card_id,
                     card_external_id,
                     participant_id,
-                    self._clean_text(payload.get("message")) or "",
-                    _json_dumps(_normalise_metadata(payload.get("metadata"))),
+                    message,
+                    _json_dumps(metadata),
                     now,
                 ),
             )
@@ -156,3 +174,163 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
                 raise RuntimeError("event insert did not return an id")
             row = self._one(conn, "SELECT * FROM events WHERE id = ?", (int(cursor.lastrowid),))
             return self._event_from_row(row)
+
+    def _agent_feedback_comment_id(
+        self,
+        conn: Any,
+        *,
+        event_type: str,
+        board_slug: str,
+        card_id: int | None,
+        participant_id: str | None,
+        message: str,
+        metadata: dict[str, Any],
+        created_at: str,
+    ) -> int | None:
+        feedback_events = {
+            "agent.finished",
+            "agent.feedback",
+            "agent.handoff",
+            "subagent.stopped",
+            "subagent.finished",
+            "subagent.feedback",
+            "subagent.handoff",
+        }
+        if event_type not in feedback_events:
+            return None
+        if not card_id or not message:
+            return None
+
+        source_event_key = self._feedback_source_event_key(
+            event_type=event_type,
+            card_id=card_id,
+            participant_id=participant_id,
+            message=message,
+            metadata=metadata,
+        )
+        existing = self._feedback_comment_by_source_event(
+            conn,
+            board_slug=board_slug,
+            card_id=card_id,
+            source_event_key=source_event_key,
+        )
+        if existing is not None:
+            return existing
+
+        participant = None
+        if participant_id:
+            participant = self._one(
+                conn,
+                "SELECT id, display_name, kind FROM participants WHERE id = ?",
+                (participant_id,),
+            )
+        author_name = _normalise_comment_author_name(
+            self._clean_text(participant["display_name"] if participant else None)
+            or participant_id
+            or "agent"
+        )
+        author_kind = self._clean_text(participant["kind"] if participant else None) or "agent"
+        if author_kind not in PARTICIPANT_KINDS:
+            author_kind = "agent"
+        try:
+            cursor = conn.execute(
+                """
+                INSERT INTO card_comments (
+                    board_slug, card_id, participant_id,
+                    author_name, author_kind, body, source_event_key, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    board_slug,
+                    card_id,
+                    participant_id if participant else None,
+                    author_name or "agent",
+                    author_kind,
+                    message,
+                    source_event_key,
+                    created_at,
+                ),
+            )
+            lastrowid = cursor.lastrowid
+        except sqlite3.IntegrityError:
+            existing = self._feedback_comment_by_source_event(
+                conn,
+                board_slug=board_slug,
+                card_id=card_id,
+                source_event_key=source_event_key,
+            )
+            if existing is not None:
+                return existing
+            raise
+        if lastrowid is None:
+            raise RuntimeError("card comment insert did not return an id")
+        conn.execute("UPDATE cards SET updated_at = ? WHERE id = ?", (created_at, card_id))
+        return int(lastrowid)
+
+    def _feedback_comment_by_source_event(
+        self,
+        conn: Any,
+        *,
+        board_slug: str,
+        card_id: int,
+        source_event_key: str,
+    ) -> int | None:
+        row = self._one(
+            conn,
+            """
+            SELECT id FROM card_comments
+            WHERE board_slug = ?
+              AND card_id = ?
+              AND source_event_key = ?
+            """,
+            (board_slug, card_id, source_event_key),
+        )
+        return int(row["id"]) if row else None
+
+    def _feedback_source_event_key(
+        self,
+        *,
+        event_type: str,
+        card_id: int,
+        participant_id: str | None,
+        message: str,
+        metadata: dict[str, Any],
+    ) -> str:
+        explicit = self._clean_text(
+            metadata.get("feedback_key")
+            or metadata.get("idempotency_key")
+            or metadata.get("dedupe_key")
+            or metadata.get("event_id")
+        )
+        if explicit:
+            return f"explicit:{explicit}"
+
+        hook = self._clean_text(metadata.get("hook"))
+        raw_agent_id = self._clean_text(metadata.get("raw_agent_id"))
+        cwd = self._clean_text(metadata.get("cwd"))
+        project = self._clean_text(metadata.get("project"))
+        if hook or raw_agent_id:
+            return "|".join(
+                [
+                    "hook",
+                    event_type,
+                    str(card_id),
+                    participant_id or "",
+                    hook or "",
+                    raw_agent_id or "",
+                    project or "",
+                    cwd or "",
+                    message,
+                ]
+            )
+
+        return "|".join(
+            [
+                "event",
+                event_type,
+                str(card_id),
+                participant_id or "",
+                message,
+            ]
+        )

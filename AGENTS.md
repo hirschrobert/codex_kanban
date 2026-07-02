@@ -6,17 +6,15 @@ human developers, the main AI agent, and optional AI subagents.
 ## Codex Kanban
 
 - Use the `codex-kanban` skill for concrete feature, fix, docs, test, review,
-  release, registration, or multi-agent work in this repository.
-- Do not create Kanban cards or workflow updates for trivial local operations,
-  quick command checks, or discussion that does not change project work.
-- For exploratory feature discussion, Kanban is optional and should stay light:
-  use only relevant read-only agents when helpful, and wait for human approval
-  before turning ideas into implementation cards.
-- For concrete multi-agent work, use subagents and parallel delegation whenever
-  it is feasible and safe. Create a parent coordination card plus one linked
-  child card for the main implementer and each delegated subagent doing
-  material work. Assign each child to the board-scoped participant doing that
-  work, and record start/finish/handoff on that child card.
+  release, registration, or multi-agent work. Skip Kanban for trivial command
+  checks and keep exploratory discussion read-only until implementation is
+  approved.
+- For concrete multi-agent work, create one parent coordination card plus one
+  linked child for the main implementer and each delegated subagent doing
+  material work. Assign children to board-scoped participants and record
+  start/finish/handoff on those child cards.
+- For ecosystem release/deploy work, record affected apps, repos, worktrees,
+  and deployment dispositions before marking production deployment complete.
 - Keep this app abstract. Do not hardcode project-specific domains, agent names,
   release trains, accounting rules, or deployment policy into the dashboard.
 - Concrete project rules belong in each project repository's `AGENTS.md` and,

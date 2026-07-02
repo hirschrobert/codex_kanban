@@ -44,6 +44,15 @@ def _add_card_handoff_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--assignee")
     parser.add_argument("--handoff-sha")
     parser.add_argument("--blocker")
+    parser.add_argument(
+        "--deployment-disposition",
+        action="append",
+        default=[],
+        help=(
+            "Deployment checklist entry, e.g. "
+            "'Portal|/repo=deployed:verified live version'. Repeat for each app/repo."
+        ),
+    )
     parser.add_argument("--check", action="append", default=[])
     parser.add_argument("--file-changed", action="append", default=[])
     parser.add_argument("--assumption", action="append", default=[])

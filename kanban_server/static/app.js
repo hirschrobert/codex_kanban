@@ -31,6 +31,8 @@ const {
   cardCreatorText,
   intakeKindText,
   intakeSourceText,
+  affectedProjectPathText,
+  deploymentDispositionText,
   confirmCoordination,
 } = window.Kanban;
 
@@ -200,6 +202,12 @@ function renderCard(card) {
   const intakeKind = intakeKindText(card);
   const intakeSource = intakeSourceText(card);
   const affectedCount = Array.isArray(card.affected_paths) ? card.affected_paths.length : 0;
+  const affectedProjectCount = Array.isArray(card.affected_project_paths)
+    ? card.affected_project_paths.length
+    : 0;
+  const deploymentCount = Array.isArray(card.deployment_dispositions)
+    ? card.deployment_dispositions.length
+    : 0;
   const stagedArchive = archiveSelection(card);
   const archiveDisabled = state.showArchived && !card.archived;
   const archiveLabel = state.showArchived
@@ -234,6 +242,8 @@ function renderCard(card) {
         ${parentCount ? `<span class="chip">${parentCount} parent${parentCount === 1 ? "" : "s"}</span>` : ""}
         ${childCount ? `<span class="chip">${childCount} child${childCount === 1 ? "" : "ren"}</span>` : ""}
         ${affectedCount ? `<span class="chip">Affected: ${affectedCount}</span>` : ""}
+        ${affectedProjectCount ? `<span class="chip">Ecosystem: ${affectedProjectCount}</span>` : ""}
+        ${deploymentCount ? `<span class="chip">Deploy: ${deploymentCount}</span>` : ""}
         ${card.target_branch ? `<span class="chip">${escapeHtml(card.target_branch)}</span>` : ""}
         ${card.feature_branch ? `<span class="chip">${escapeHtml(card.feature_branch)}</span>` : ""}
       </div>
@@ -500,6 +510,9 @@ function openCardDialog(card = null) {
   cardForm.elements.affected_paths.value = Array.isArray(card?.affected_paths)
     ? card.affected_paths.map(normalizeNewlines).join("\n")
     : "";
+  cardForm.elements.deployment_dispositions.value = Array.isArray(card?.deployment_dispositions)
+    ? card.deployment_dispositions.map(deploymentDispositionText).join("\n")
+    : "";
   cardForm.elements.evidence.value = normalizeNewlines(card?.evidence || "");
   cardForm.elements.archived.checked = Boolean(card?.archived);
   renderComments(card);
@@ -584,6 +597,7 @@ async function saveCard(event) {
     .map((item) => item.trim())
     .filter(Boolean);
   payload.affected_paths = formList(payload.affected_paths);
+  payload.deployment_dispositions = formList(payload.deployment_dispositions);
   payload.parent_external_ids = formList(payload.parent_external_ids);
   payload.child_external_ids = formList(payload.child_external_ids);
   payload.archived = form.get("archived") === "on";

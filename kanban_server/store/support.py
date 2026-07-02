@@ -57,6 +57,7 @@ PARTICIPANT_STATUSES = {
 
 JSON_LIST_FIELDS = {
     "affected_paths",
+    "deployment_dispositions",
     "files_changed",
     "checks",
     "assumptions",
@@ -244,6 +245,108 @@ def _normalise_list(value: Any) -> list[Any]:
     return [value]
 
 
+def _normalise_deployment_dispositions(value: Any) -> list[dict[str, str]]:
+    dispositions: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str, str]] = set()
+    for item in _normalise_list(value):
+        entry = _deployment_disposition_entry(item)
+        if not entry:
+            continue
+        key = (
+            entry.get("label", ""),
+            entry.get("path", ""),
+            entry.get("status", ""),
+            entry.get("note", ""),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        dispositions.append(entry)
+    return dispositions
+
+
+def _deployment_disposition_entry(value: Any) -> dict[str, str] | None:
+    if isinstance(value, dict):
+        path = _clean_deployment_text(
+            value.get("path")
+            or value.get("repo")
+            or value.get("repository")
+            or value.get("worktree")
+            or value.get("target")
+        )
+        label = _clean_deployment_text(value.get("label") or value.get("app") or value.get("name"))
+        status = _clean_deployment_text(
+            value.get("status") or value.get("disposition") or value.get("state")
+        )
+        note = _clean_deployment_text(
+            value.get("note") or value.get("reason") or value.get("detail")
+        )
+    else:
+        label, path, status, note = _parse_deployment_disposition_text(str(value or ""))
+
+    if not path and label:
+        path, label = label, ""
+    if not path:
+        return None
+    entry = {"path": path, "status": status or "pending"}
+    if label:
+        entry["label"] = label
+    if note:
+        entry["note"] = note
+    return entry
+
+
+def _parse_deployment_disposition_text(value: str) -> tuple[str, str, str, str]:
+    text = value.strip()
+    if not text:
+        return "", "", "", ""
+    if text.startswith("{"):
+        parsed = _json_loads(text, {})
+        if isinstance(parsed, dict):
+            entry = _deployment_disposition_entry(parsed)
+            if entry:
+                return (
+                    entry.get("label", ""),
+                    entry.get("path", ""),
+                    entry.get("status", ""),
+                    entry.get("note", ""),
+                )
+    target, separator, disposition = text.partition("=")
+    if separator:
+        label, path = _deployment_target_parts(target)
+        status, note = _deployment_status_parts(disposition)
+        return label, path, status, note
+
+    parts = [_clean_deployment_text(part) for part in text.split("|")]
+    parts = [part for part in parts if part]
+    if len(parts) >= 4:
+        return parts[0], parts[1], parts[2], "|".join(parts[3:])
+    if len(parts) == 3:
+        return "", parts[0], parts[1], parts[2]
+    if len(parts) == 2:
+        return "", parts[0], parts[1], ""
+    return "", parts[0] if parts else "", "pending", ""
+
+
+def _deployment_target_parts(value: str) -> tuple[str, str]:
+    parts = [_clean_deployment_text(part) for part in value.split("|", 1)]
+    if len(parts) == 2:
+        return parts[0], parts[1]
+    return "", parts[0] if parts else ""
+
+
+def _deployment_status_parts(value: str) -> tuple[str, str]:
+    if "|" in value:
+        status, note = value.split("|", 1)
+        return _clean_deployment_text(status), _clean_deployment_text(note)
+    status, separator, note = value.partition(":")
+    return _clean_deployment_text(status), _clean_deployment_text(note) if separator else ""
+
+
+def _clean_deployment_text(value: Any) -> str:
+    return _normalise_text_newlines(str(value or "")).strip()
+
+
 def _normalise_metadata(value: Any) -> dict[str, Any]:
     if value is None:
         return {}
@@ -314,6 +417,7 @@ __all__ = [
     "_json_dumps",
     "_json_loads",
     "_normalise_list",
+    "_normalise_deployment_dispositions",
     "_normalise_metadata",
     "_normalise_text_newlines",
     "_normalise_comment_author_name",

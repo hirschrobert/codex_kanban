@@ -13,6 +13,10 @@ Use this checklist before pushing this repository to a public GitHub remote.
 
 ## Git Refs
 
+Before pushing refs or tags, record the release scope on the Kanban release
+card: included/excluded cards and branches, affected apps/repos/worktrees, and
+deployment dispositions for anything production-facing.
+
 Push only the intended release branch or tag, then fast-forward `main` to the
 same commit SHA after release-branch CI passes:
 

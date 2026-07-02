@@ -17,6 +17,7 @@ from .support import (
     STALE_AFTER_SECONDS,
     _json_dumps,
     _normalise_comment_author_name,
+    _normalise_deployment_dispositions,
     _normalise_list,
     slugify,
     utc_now,
@@ -114,6 +115,7 @@ class CardStoreMixin(_StoreMixinContract):
             ]
             self._attach_dependency_links(conn, cards)
             self._attach_card_comments(conn, cards)
+            self._attach_affected_project_paths(cards, active_project)
             cards = self._cards_with_coordination(cards, participants)
             events_desc = [
                 self._event_from_row(row)
@@ -161,6 +163,14 @@ class CardStoreMixin(_StoreMixinContract):
             card = self._card_from_row(row)
             self._attach_dependency_links(conn, [card])
             self._attach_card_comments(conn, [card])
+            active_project = self._project_from_row(
+                self._one(
+                    conn,
+                    "SELECT * FROM projects WHERE board_slug = ? AND removed_at IS NULL",
+                    (card["board_slug"],),
+                )
+            )
+            self._attach_affected_project_paths([card], active_project)
             return card
 
     def create_card(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -233,6 +243,9 @@ class CardStoreMixin(_StoreMixinContract):
                 "parent_external_id": None,
                 "child_external_ids": "[]",
                 "affected_paths": _json_dumps(_normalise_list(payload.get("affected_paths"))),
+                "deployment_dispositions": _json_dumps(
+                    _normalise_deployment_dispositions(payload.get("deployment_dispositions"))
+                ),
                 "files_changed": _json_dumps(_normalise_list(payload.get("files_changed"))),
                 "checks": _json_dumps(_normalise_list(payload.get("checks"))),
                 "assumptions": _json_dumps(_normalise_list(payload.get("assumptions"))),
@@ -326,7 +339,12 @@ class CardStoreMixin(_StoreMixinContract):
 
             for field in JSON_LIST_FIELDS:
                 if field in payload:
-                    updates[field] = _json_dumps(_normalise_list(payload[field]))
+                    if field == "deployment_dispositions":
+                        updates[field] = _json_dumps(
+                            _normalise_deployment_dispositions(payload[field])
+                        )
+                    else:
+                        updates[field] = _json_dumps(_normalise_list(payload[field]))
 
             if "archived" in payload:
                 updates["archived_at"] = (

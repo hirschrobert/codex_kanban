@@ -120,6 +120,7 @@ class SchemaStoreMixin(_StoreMixinContract):
                     parent_external_id TEXT,
                     child_external_ids TEXT NOT NULL DEFAULT '[]',
                     affected_paths TEXT NOT NULL DEFAULT '[]',
+                    deployment_dispositions TEXT NOT NULL DEFAULT '[]',
                     files_changed TEXT NOT NULL DEFAULT '[]',
                     checks TEXT NOT NULL DEFAULT '[]',
                     assumptions TEXT NOT NULL DEFAULT '[]',
@@ -157,6 +158,7 @@ class SchemaStoreMixin(_StoreMixinContract):
                     author_name TEXT NOT NULL DEFAULT 'Unknown',
                     author_kind TEXT NOT NULL DEFAULT 'human',
                     body TEXT NOT NULL,
+                    source_event_key TEXT,
                     created_at TEXT NOT NULL,
                     FOREIGN KEY (board_slug) REFERENCES boards(slug) ON DELETE CASCADE,
                     FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE,
@@ -262,6 +264,12 @@ class SchemaStoreMixin(_StoreMixinContract):
                 "affected_paths",
                 "TEXT NOT NULL DEFAULT '[]'",
             )
+            self._ensure_column(
+                conn,
+                "cards",
+                "deployment_dispositions",
+                "TEXT NOT NULL DEFAULT '[]'",
+            )
             self._ensure_column(conn, "cards", "repeat_cadence", "TEXT NOT NULL DEFAULT 'none'")
             self._ensure_column(
                 conn,
@@ -291,6 +299,12 @@ class SchemaStoreMixin(_StoreMixinContract):
                 "author_kind",
                 "TEXT NOT NULL DEFAULT 'human'",
             )
+            self._ensure_column(conn, "card_comments", "source_event_key", "TEXT")
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_card_comments_source_event
+                    ON card_comments(board_slug, card_id, source_event_key)
+                    WHERE source_event_key IS NOT NULL AND source_event_key != ''
+                """)
             self._backfill_card_people(conn)
             self._backfill_card_links(conn)
             conn.commit()

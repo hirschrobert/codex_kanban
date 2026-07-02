@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 from typing import Any
 
@@ -69,18 +70,23 @@ def _description_with_context(
     risks: list[str] | None = None,
     acceptance: list[str] | None = None,
 ) -> str:
-    sections = [description.strip()]
-    if why and why.strip():
+    base_description = description.strip()
+    sections = [base_description]
+    if why and why.strip() and not _has_context_section(base_description, "Why this card exists:"):
         sections.append(f"Why this card exists:\n{why.strip()}")
-    if risks:
+    if risks and not _has_context_section(base_description, "If this is not fixed:"):
         lines = [_bullet_line(item) for item in risks if item.strip()]
         if lines:
             sections.append("If this is not fixed:\n" + "\n".join(lines))
-    if acceptance:
+    if acceptance and not _has_context_section(base_description, "Acceptance criteria:"):
         lines = [_bullet_line(item) for item in acceptance if item.strip()]
         if lines:
             sections.append("Acceptance criteria:\n" + "\n".join(lines))
     return "\n\n".join(sections)
+
+
+def _has_context_section(description: str, heading: str) -> bool:
+    return bool(re.search(rf"(?im)^\s*{re.escape(heading)}\s*$", description))
 
 
 def _bullet_line(value: str) -> str:
@@ -135,6 +141,7 @@ def _card_payload(args: argparse.Namespace) -> dict[str, Any]:
         "impact": args.impact,
         "evidence": args.evidence,
         "affected_paths": args.affected_path or [],
+        "deployment_dispositions": args.deployment_disposition or [],
         "target_repo": args.target_repo,
         "target_branch": args.target_branch,
         "starting_target_sha": args.start_sha,
@@ -171,6 +178,7 @@ def _card_update_payload(args: argparse.Namespace) -> dict[str, Any]:
         "blocker_reason": blocker_reason,
         "parent_external_id": args.parent,
         "child_external_ids": args.child or None,
+        "deployment_dispositions": args.deployment_disposition or None,
         "checks": args.check or None,
         "files_changed": args.file_changed or None,
         "assumptions": args.assumption or None,

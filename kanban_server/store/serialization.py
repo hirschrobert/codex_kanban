@@ -5,6 +5,7 @@ import sqlite3
 from collections import defaultdict
 from datetime import UTC, datetime
 from itertools import combinations
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .support import (
@@ -26,6 +27,7 @@ from .support import (
     STALE_AFTER_SECONDS,
     _json_loads,
     _normalise_comment_author_name,
+    _normalise_deployment_dispositions,
     _normalise_text_newlines,
     _utc_datetime,
     slugify,
@@ -50,6 +52,9 @@ class SerializationCoordinationMixin(_StoreMixinContract):
         card = dict(row)
         for field in JSON_LIST_FIELDS:
             card[field] = _json_loads(card.get(field), [])
+        card["deployment_dispositions"] = _normalise_deployment_dispositions(
+            card.get("deployment_dispositions")
+        )
         card["child_external_ids"] = _json_loads(card.get("child_external_ids"), [])
         parent_external_id = self._clean_text(card.get("parent_external_id"))
         card["parent_external_id"] = parent_external_id
@@ -70,12 +75,108 @@ class SerializationCoordinationMixin(_StoreMixinContract):
         card.setdefault("dependency_warnings", [])
         card.setdefault("conflicts", [])
         card.setdefault("coordination_warnings", [])
+        card.setdefault("affected_project_paths", [])
         card.setdefault("created_by", None)
         card.setdefault("owner", None)
         card.setdefault("assignee", None)
         card.setdefault("assignee_is_active", False)
         card.setdefault("assignee_is_stale", False)
         return card
+
+    def _attach_affected_project_paths(
+        self,
+        cards: list[dict[str, Any]],
+        active_project: dict[str, Any] | None,
+    ) -> None:
+        project_paths = active_project.get("paths") if active_project else []
+        if not isinstance(project_paths, list) or not project_paths:
+            for card in cards:
+                card["affected_project_paths"] = []
+            return
+
+        for card in cards:
+            card["affected_project_paths"] = self._affected_project_path_entries(
+                card,
+                project_paths,
+            )
+
+    def _affected_project_path_entries(
+        self,
+        card: dict[str, Any],
+        project_paths: list[Any],
+    ) -> list[dict[str, Any]]:
+        candidates = self._card_scope_paths(card)
+        if not candidates:
+            return []
+
+        entries: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for raw_entry in project_paths:
+            if isinstance(raw_entry, dict):
+                label = self._clean_text(raw_entry.get("label"))
+                raw_path = self._clean_text(raw_entry.get("path"))
+            else:
+                label = None
+                raw_path = self._clean_text(raw_entry)
+            path = self._normalised_path(raw_path)
+            if not path or path in seen:
+                continue
+            matches = [
+                candidate for candidate in candidates if self._paths_overlap(path, candidate)
+            ]
+            if not matches:
+                continue
+            seen.add(path)
+            entries.append(
+                {
+                    "label": label or Path(path).name or path,
+                    "path": path,
+                    "source_paths": sorted(set(matches)),
+                }
+            )
+        return entries
+
+    def _card_scope_paths(self, card: dict[str, Any]) -> list[str]:
+        raw_paths: list[Any] = [
+            *card.get("affected_paths", []),
+            card.get("target_repo"),
+            card.get("worktree_path"),
+        ]
+        raw_paths.extend(
+            item.get("path")
+            for item in card.get("deployment_dispositions", [])
+            if isinstance(item, dict)
+        )
+        target_repo = self._normalised_path(card.get("target_repo"))
+        for item in card.get("files_changed", []):
+            path = self._normalised_path(item)
+            if not path:
+                continue
+            if os.path.isabs(path) or not target_repo:
+                raw_paths.append(path)
+            else:
+                raw_paths.append(os.path.join(target_repo, path))
+
+        paths: list[str] = []
+        seen: set[str] = set()
+        for raw_path in raw_paths:
+            path = self._normalised_path(raw_path)
+            if not path or path in seen:
+                continue
+            seen.add(path)
+            paths.append(path)
+        return paths
+
+    @staticmethod
+    def _paths_overlap(left: str, right: str) -> bool:
+        left_path = os.path.normcase(os.path.normpath(left))
+        right_path = os.path.normcase(os.path.normpath(right))
+        if left_path == right_path:
+            return True
+        try:
+            return os.path.commonpath([left_path, right_path]) in {left_path, right_path}
+        except ValueError:
+            return False
 
     def _participant_from_row(
         self, row: sqlite3.Row | dict[str, Any] | None, *, now: datetime

@@ -58,6 +58,51 @@ class KanbanStoreProjectCoordinationTest(unittest.TestCase):
             )
         )
 
+    def test_snapshot_derives_affected_project_paths_for_ecosystems(self) -> None:
+        store = self.make_store()
+        project = store.register_project(
+            {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "card_prefix": "DM",
+                "root_path": "/workspace",
+                "paths": [
+                    {"label": "Portal", "path": "/workspace/portal"},
+                    {"label": "Backend", "path": "/workspace/db_worker"},
+                    {"label": "Thunderbird", "path": "/workspace/thunderbird"},
+                ],
+            }
+        )
+        store.create_card(
+            {
+                "board_slug": project["board_slug"],
+                "title": "Deploy touched apps",
+                "description": "Release everything changed by the request.",
+                "affected_paths": ["/workspace/portal/src/App.jsx"],
+                "target_repo": "/workspace/db_worker",
+                "files_changed": ["worker.py"],
+                "deployment_dispositions": ["/workspace/portal=deployed:verified live bundle"],
+            }
+        )
+
+        card = store.snapshot("demo")["cards"][0]
+
+        self.assertEqual(
+            [entry["label"] for entry in card["affected_project_paths"]],
+            ["Portal", "Backend"],
+        )
+        self.assertEqual(
+            card["deployment_dispositions"],
+            [
+                {
+                    "path": "/workspace/portal",
+                    "status": "deployed",
+                    "note": "verified live bundle",
+                }
+            ],
+        )
+
     def test_register_project_seeds_expanded_default_agent_profiles(self) -> None:
         store = self.make_store()
         project = store.register_project(
@@ -407,6 +452,59 @@ class KanbanStoreProjectCoordinationTest(unittest.TestCase):
         self.assertEqual(participant["status"], "running")
         self.assertEqual(event["metadata"]["scope"], "dashboard")
         self.assertTrue(any(item["participant_id"] == "demo-user" for item in snapshot["events"]))
+
+    def test_delegated_agent_feedback_event_becomes_card_comment(self) -> None:
+        store = self.make_store()
+        self.register_demo_project(store)
+        participant = store.upsert_participant(
+            {
+                "id": "demo-project-reviewer",
+                "display_name": "project_reviewer",
+                "kind": "agent",
+                "status": "running",
+                "board_slug": "demo",
+            }
+        )
+        card = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Review handoff",
+                "description": "Capture delegated feedback.",
+            }
+        )
+
+        event_payload = {
+            "board_slug": "demo",
+            "event_type": "subagent.stopped",
+            "card_id": card["id"],
+            "participant_id": participant["id"],
+            "message": "Review found one missing deployment disposition.",
+        }
+        event = store.create_event(event_payload)
+        repeated_event = store.create_event(event_payload)
+        distinct_event = store.create_event(
+            {
+                **event_payload,
+                "message": "Review also wants browser-level coverage later.",
+            }
+        )
+        updated = store.get_card(card["id"])
+        assert updated is not None
+
+        self.assertEqual(updated["comment_count"], 2)
+        self.assertEqual(
+            updated["comments"][0]["body"],
+            "Review found one missing deployment disposition.",
+        )
+        self.assertEqual(updated["comments"][0]["participant_id"], "demo-project-reviewer")
+        self.assertEqual(updated["comments"][0]["author_kind"], "agent")
+        self.assertEqual(event["metadata"]["comment_id"], updated["comments"][0]["id"])
+        self.assertEqual(repeated_event["metadata"]["comment_id"], updated["comments"][0]["id"])
+        self.assertEqual(distinct_event["metadata"]["comment_id"], updated["comments"][1]["id"])
+        self.assertEqual(
+            updated["comments"][1]["body"],
+            "Review also wants browser-level coverage later.",
+        )
 
     def test_reset_clears_work_state_and_projects(self) -> None:
         store = self.make_store()

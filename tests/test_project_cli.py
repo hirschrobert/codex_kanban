@@ -83,6 +83,47 @@ class ProjectCliTest(unittest.TestCase):
         )
         self.assertEqual(card["checks"], ["python3 -m unittest discover -s tests"])
 
+    def test_card_create_does_not_duplicate_existing_context_sections(self) -> None:
+        db_path = self.make_db_path()
+        output = io.StringIO()
+
+        with contextlib.redirect_stdout(output):
+            exit_code = project.main(
+                [
+                    "card-create",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--title",
+                    "Already shaped card",
+                    "--description",
+                    (
+                        "Coordinate deployment scope.\n\n"
+                        "Why this card exists:\n"
+                        "The request already carries structured context.\n\n"
+                        "If this is not fixed:\n"
+                        "- The app may append duplicate sections.\n\n"
+                        "Acceptance criteria:\n"
+                        "- Keep one clean rationale block."
+                    ),
+                    "--why",
+                    "This should not create a second why heading.",
+                    "--risk",
+                    "This should not create a second risk heading.",
+                    "--acceptance",
+                    "This should not create a second acceptance heading.",
+                ]
+            )
+
+        card = json.loads(output.getvalue())
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(card["description"].count("Why this card exists:"), 1)
+        self.assertEqual(card["description"].count("If this is not fixed:"), 1)
+        self.assertEqual(card["description"].count("Acceptance criteria:"), 1)
+        self.assertNotIn("This should not create a second why heading.", card["description"])
+
     def test_card_create_defaults_to_ai_agent_manager_actor(self) -> None:
         db_path = self.make_db_path()
         output = io.StringIO()
@@ -151,6 +192,49 @@ class ProjectCliTest(unittest.TestCase):
         self.assertEqual(card["impact"], "Blocks invoice review.")
         self.assertEqual(card["evidence"], "Observed in the desktop client.")
         self.assertEqual(card["affected_paths"], ["/workspace/app", "/workspace/db_worker"])
+
+    def test_card_create_records_deployment_dispositions(self) -> None:
+        db_path = self.make_db_path()
+        output = io.StringIO()
+
+        with contextlib.redirect_stdout(output):
+            exit_code = project.main(
+                [
+                    "card-create",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--title",
+                    "Deploy ecosystem changes",
+                    "--description",
+                    "Track production deployment for every affected app.",
+                    "--deployment-disposition",
+                    "Portal|/workspace/portal=deployed:0.2.17 live",
+                    "--deployment-disposition",
+                    "/workspace/db_worker=not_required:backend unchanged",
+                ]
+            )
+
+        card = json.loads(output.getvalue())
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            card["deployment_dispositions"],
+            [
+                {
+                    "path": "/workspace/portal",
+                    "status": "deployed",
+                    "label": "Portal",
+                    "note": "0.2.17 live",
+                },
+                {
+                    "path": "/workspace/db_worker",
+                    "status": "not_required",
+                    "note": "backend unchanged",
+                },
+            ],
+        )
 
     def test_card_create_reports_bad_assignee_without_traceback(self) -> None:
         db_path = self.make_db_path()

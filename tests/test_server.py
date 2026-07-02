@@ -538,6 +538,7 @@ class ServerDefaultsTest(unittest.TestCase):
                     "impact": "Reduces manual searching.",
                     "evidence": "Requested during triage.",
                     "affected_paths": ["/workspace/portal"],
+                    "deployment_dispositions": [{"path": "/workspace/portal", "status": "pending"}],
                 },
             )
             patch_status, updated = self.request_json(
@@ -546,6 +547,7 @@ class ServerDefaultsTest(unittest.TestCase):
                 {
                     "intake_source": "main_agent",
                     "affected_paths": ["/workspace/portal", "/workspace/db_worker"],
+                    "deployment_dispositions": ["/workspace/portal=deployed:verified live bundle"],
                 },
                 method="PATCH",
             )
@@ -557,10 +559,24 @@ class ServerDefaultsTest(unittest.TestCase):
             self.assertEqual(card["impact"], "Reduces manual searching.")
             self.assertEqual(card["evidence"], "Requested during triage.")
             self.assertEqual(card["affected_paths"], ["/workspace/portal"])
+            self.assertEqual(
+                card["deployment_dispositions"],
+                [{"path": "/workspace/portal", "status": "pending"}],
+            )
             self.assertEqual(patch_status, 200)
             self.assertEqual(updated["intake_source"], "main_agent")
             self.assertEqual(
                 updated["affected_paths"], ["/workspace/portal", "/workspace/db_worker"]
+            )
+            self.assertEqual(
+                updated["deployment_dispositions"],
+                [
+                    {
+                        "path": "/workspace/portal",
+                        "status": "deployed",
+                        "note": "verified live bundle",
+                    }
+                ],
             )
 
     def test_delete_card_requires_archived_card(self) -> None:

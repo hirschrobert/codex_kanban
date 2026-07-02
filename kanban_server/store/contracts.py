@@ -38,6 +38,12 @@ class StoreMixinContract:
         cards: list[dict[str, Any]],
     ) -> None: ...
 
+    def _attach_affected_project_paths(
+        self,
+        cards: list[dict[str, Any]],
+        active_project: dict[str, Any] | None,
+    ) -> None: ...
+
     def _attach_dependency_links(
         self,
         conn: sqlite3.Connection,

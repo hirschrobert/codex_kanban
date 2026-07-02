@@ -70,10 +70,14 @@ report, coordination task, maintenance task, review, or release item. `Source`
 can distinguish main-agent intake from dashboard, CLI, or automation-created
 cards. `Reported By`, `Impact`, `Affected Paths`, and `Evidence` preserve
 human context so another agent can continue without reading the chat
-transcript. `Status` defaults to `Backlog`, `Priority` defaults to `Normal`,
-`Repeat` defaults to `None`, and `Assignee` can stay unassigned until a human
-or agent takes the card. Branch, repo, SHA, blocker, and checks fields are for
-later handoffs or specialist work.
+transcript. For ecosystem work, `Affected Paths` should name every implicated
+app, repo, worktree, or file path. `Deployment Dispositions` records the
+release/deploy checklist, for example
+`Portal|/workspace/portal=deployed:0.2.17 live` or
+`Backend|/workspace/db_worker=not_required:unchanged`. `Status` defaults to
+`Backlog`, `Priority` defaults to `Normal`, `Repeat` defaults to `None`, and
+`Assignee` can stay unassigned until a human or agent takes the card. Branch,
+repo, SHA, blocker, and checks fields are for later handoffs or specialist work.
 
 Cards can also be linked as dependencies. A parent card depends on its child
 cards. In the generic dashboard policy, a parent cannot move into
@@ -103,7 +107,10 @@ wants an immediate workflow card.
 
 Card notes capture human or agent context that future work should consider.
 Notes are scoped to the card's board and appear in the card dialog with writer
-name, writer kind, date, and time.
+name, writer kind, date, and time. Agent `finished`, `feedback`, and `handoff`
+events, plus hook-style subagent `stopped`, `feedback`, and `handoff` events,
+are mirrored into notes when they include a card and message so card owners do
+not need to scan the event stream for delegated feedback.
 
 Archived cards are hidden from the normal board. Use the top-bar `Archived`
 toggle to switch to archived cards only; non-archived cards are hidden in that
@@ -120,6 +127,10 @@ chat transcript:
   release, or maintenance value.
 - Add `If this is not fixed:` with concrete examples of what could happen.
 - Add `Acceptance criteria:` when there is a clear done condition.
+
+Use either those headings in the description or the CLI `--why`, `--risk`, and
+`--acceptance` helpers. Do not use both for the same section; later feedback
+belongs in notes, and separate work belongs in a child card.
 
 For a person, fill:
 
