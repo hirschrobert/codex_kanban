@@ -461,6 +461,20 @@ intended release branch for that project. The starter only creates coordination
 cards; project `AGENTS.md` still controls whether an agent may edit files,
 commit, publish, migrate, sign, deploy, or ask for human approval.
 
+## Release Integration
+
+For public releases, keep feature, fix, and release metadata commits on
+`release/<version>`. After release-branch CI passes on the release tip, create
+a no-fast-forward merge commit from the current public `main` and the release
+branch. Push that merge commit back to `release/<version>` first and wait for
+CI on that exact SHA, then fast-forward `main` to the same merge SHA and tag
+that merge commit.
+
+This keeps `main` easy to scan by release merge points while preserving the
+release branch as the visible group of included work. Do not squash, rebase,
+rewrite, or create a separate untested main-only commit for release
+integration.
+
 If a card assignment fails because the assignee is unknown, choose an existing
 participant from the snapshot or register the participant first:
 

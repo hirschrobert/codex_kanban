@@ -56,12 +56,18 @@ human developers, the main AI agent, and optional AI subagents.
 - Before pushing a public release, audit tracked files and the intended push
   refs for personal data, local machine paths, local databases, secrets, and
   generated coordination state.
-- Public pushes must target explicit release branches or tags only. Do not
-  mirror every local ref from a development repository.
-- The full CI workflow runs on release branches, not on main pushes. Advance
-  `main` only by fast-forwarding it to the exact release commit SHA that passed
-  CI on `release/**`; do not merge, squash, rebase, or create a new main-only
-  commit.
+- Public pushes must target only explicit release branches, the approved
+  `main` release-merge fast-forward ref, or release tags. Do not mirror every
+  local ref from a development repository.
+- The full CI workflow runs on release branches, not on main pushes. Keep
+  feature, fix, and release metadata commits on `release/<version>`, then
+  integrate them with an explicit no-fast-forward release merge commit whose
+  first parent is the previous `main` and whose second parent is the release
+  branch tip. Push that merge commit back to `release/<version>` and wait for
+  CI on that exact SHA before advancing `main`.
+- Advance `main` only by fast-forwarding it to the exact release merge commit
+  SHA that passed CI on `release/**`; do not squash, rebase, rewrite, or create
+  an untested main-only commit.
 - Rewriting author metadata, signatures, or local refs is destructive release
   preparation and requires explicit human approval plus the intended public
   author/signing identity.
