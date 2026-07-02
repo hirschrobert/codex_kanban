@@ -17,6 +17,7 @@ from typing import Any, cast
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .app_metadata import app_metadata as current_app_metadata
+from .project.registration import auto_register_payload_for_cwd
 from .store.core import KanbanStore
 from .store.support import DEFAULT_DB_PATH
 
@@ -337,6 +338,48 @@ class KanbanHandler(BaseHTTPRequestHandler):
                     }
                 )
                 return
+            if parsed.path == "/api/overview":
+                query = parse_qs(parsed.query)
+                board = query.get("board", [None])[0]
+                cwd = query.get("cwd", [None])[0]
+                repo = query.get("repo", [None])[0]
+                include_archived = self._truthy_query(query, "include_archived")
+                archived_only = self._truthy_query(query, "archived_only")
+                limit = self._int_query(query, "limit")
+                result = self.kanban_server.store.overview(
+                    board,
+                    cwd=cwd,
+                    repo=repo,
+                    include_archived=include_archived,
+                    archived_only=archived_only,
+                    limit=limit,
+                )
+                if (
+                    self._truthy_query(query, "register_if_missing")
+                    and not board
+                    and not result.get("matched_project")
+                    and not (result.get("project_resolution") or {}).get("ambiguous")
+                ):
+                    registration_target = repo or cwd
+                    payload = (
+                        auto_register_payload_for_cwd(registration_target)
+                        if registration_target
+                        else None
+                    )
+                    if payload:
+                        registered_project = self.kanban_server.store.register_project(payload)
+                        self._broadcast_project_change(registered_project["board_slug"])
+                        result = self.kanban_server.store.overview(
+                            board,
+                            cwd=cwd,
+                            repo=repo,
+                            include_archived=include_archived,
+                            archived_only=archived_only,
+                            limit=limit,
+                        )
+                        result["registered_project"] = registered_project
+                self._send_json(result)
+                return
             if parsed.path == "/api/workflows/due-cards":
                 query = parse_qs(parsed.query)
                 board = query.get("board", [None])[0]
@@ -382,6 +425,17 @@ class KanbanHandler(BaseHTTPRequestHandler):
             self._serve_static(parsed.path)
         except Exception as exc:
             self._send_error(exc)
+
+    @staticmethod
+    def _truthy_query(query: dict[str, list[str]], key: str) -> bool:
+        return query.get(key, ["0"])[0] in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _int_query(query: dict[str, list[str]], key: str) -> int:
+        try:
+            return int(query.get(key, ["0"])[0])
+        except ValueError:
+            return 0
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)

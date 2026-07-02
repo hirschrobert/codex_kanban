@@ -41,6 +41,8 @@ class StaticAssetTest(unittest.TestCase):
         self.assertIn('${intakeKind ? `<span class="chip">${escapeHtml(intakeKind)}</span>`', app)
         self.assertIn("Affected: ${affectedCount}", app)
         self.assertIn("Ecosystem: ${affectedProjectCount}", app)
+        self.assertIn("function affectedProjectChipsHtml(card)", app)
+        self.assertIn("affectedProjectPathText(item)", app)
         self.assertIn("Deploy: ${deploymentCount}", app)
 
     def test_card_form_exposes_optional_intake_fields(self) -> None:
@@ -57,6 +59,8 @@ class StaticAssetTest(unittest.TestCase):
             'name="evidence"',
         ]:
             self.assertIn(field, html)
+        self.assertIn('class="card-description-input"', html)
+        self.assertIn('class="advanced-card-fields"', html)
         self.assertIn("cardForm.elements.intake_source.value = card ? card?.intake_source", app)
         self.assertIn("payload.affected_paths = formList(payload.affected_paths);", app)
         self.assertIn(

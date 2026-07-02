@@ -70,7 +70,7 @@
         </label>
         <label>
           <span>Description</span>
-          <textarea name="description" rows="6" required placeholder="Request or observed problem.
+          <textarea name="description" class="card-description-input" rows="12" required placeholder="Request or observed problem.
 
 Why this card exists:
 Explain the coordination, correctness, release, or maintenance reason.
@@ -133,76 +133,81 @@ Acceptance criteria:
             <span>Assignee</span>
             <select name="assignee_id"></select>
           </label>
-          <label>
-            <span>Repeat</span>
-            <select name="repeat_cadence">
-              <option value="none">None</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </select>
-          </label>
-          <label>
-            <span>Repeat Time</span>
-            <input name="repeat_time" type="time" value="01:00" step="60">
-          </label>
-          <label>
-            <span>Parents</span>
-            <textarea name="parent_external_ids" rows="2" placeholder="cards that depend on this card, one per line"></textarea>
-          </label>
-          <label>
-            <span>Children</span>
-            <textarea name="child_external_ids" rows="2" placeholder="prerequisite cards, one per line"></textarea>
-          </label>
-          <label>
-            <span>Target Branch</span>
-            <input name="target_branch" autocomplete="off" placeholder="current or next release branch, never main">
-          </label>
-          <label>
-            <span>Target Repo</span>
-            <input name="target_repo" autocomplete="off" placeholder="repo name or /workspace/project">
-          </label>
-          <label>
-            <span>Feature Branch</span>
-            <input name="feature_branch" autocomplete="off" placeholder="feature/CARD-ID-short-title">
-          </label>
-          <label>
-            <span>Worktree Path</span>
-            <input name="worktree_path" autocomplete="off" placeholder="/path/to/worktree/project-card">
-          </label>
-          <label>
-            <span>Start SHA</span>
-            <input name="starting_target_sha" autocomplete="off" placeholder="target branch SHA before work">
-          </label>
-          <label>
-            <span>Handoff SHA</span>
-            <input name="handoff_target_sha" autocomplete="off" placeholder="target branch SHA after refresh">
-          </label>
         </div>
+        <label>
+          <span>Affected Paths</span>
+          <textarea name="affected_paths" rows="4" placeholder="one repo, app, file, or path per line"></textarea>
+        </label>
         <label>
           <span>Blocker</span>
           <textarea name="blocker_reason" rows="2" placeholder="decision, access, conflict, or dependency needed"></textarea>
         </label>
-        <label>
-          <span>Checks</span>
-          <textarea name="checks" rows="3" placeholder="one per line, e.g. pytest tests/test_store.py"></textarea>
-        </label>
-        <label>
-          <span>Affected Paths</span>
-          <textarea name="affected_paths" rows="3" placeholder="one repo, app, file, or path per line"></textarea>
-        </label>
-        <label>
-          <span>Deployment Dispositions</span>
-          <textarea name="deployment_dispositions" rows="3" placeholder="Portal|/repo=deployed:verified live version"></textarea>
-        </label>
-        <label>
-          <span>Evidence</span>
-          <textarea name="evidence" rows="3" placeholder="logs, screenshots, reproduction notes, or observed behavior"></textarea>
-        </label>
-        <label class="checkbox-field">
-          <input name="archived" type="checkbox">
-          <span>Archived</span>
-        </label>
+        <details class="advanced-card-fields">
+          <summary>More fields</summary>
+          <div class="form-grid">
+            <label>
+              <span>Target Branch</span>
+              <input name="target_branch" autocomplete="off" placeholder="current or next release branch, never main">
+            </label>
+            <label>
+              <span>Target Repo</span>
+              <input name="target_repo" autocomplete="off" placeholder="repo name or /workspace/project">
+            </label>
+            <label>
+              <span>Feature Branch</span>
+              <input name="feature_branch" autocomplete="off" placeholder="feature/CARD-ID-short-title">
+            </label>
+            <label>
+              <span>Worktree Path</span>
+              <input name="worktree_path" autocomplete="off" placeholder="/path/to/worktree/project-card">
+            </label>
+            <label>
+              <span>Start SHA</span>
+              <input name="starting_target_sha" autocomplete="off" placeholder="target branch SHA before work">
+            </label>
+            <label>
+              <span>Handoff SHA</span>
+              <input name="handoff_target_sha" autocomplete="off" placeholder="target branch SHA after refresh">
+            </label>
+            <label>
+              <span>Repeat</span>
+              <select name="repeat_cadence">
+                <option value="none">None</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </label>
+            <label>
+              <span>Repeat Time</span>
+              <input name="repeat_time" type="time" value="01:00" step="60">
+            </label>
+            <label>
+              <span>Parents</span>
+              <textarea name="parent_external_ids" rows="2" placeholder="cards that depend on this card, one per line"></textarea>
+            </label>
+            <label>
+              <span>Children</span>
+              <textarea name="child_external_ids" rows="2" placeholder="prerequisite cards, one per line"></textarea>
+            </label>
+          </div>
+          <label>
+            <span>Checks</span>
+            <textarea name="checks" rows="3" placeholder="one per line, e.g. pytest tests/test_store.py"></textarea>
+          </label>
+          <label>
+            <span>Deployment Dispositions</span>
+            <textarea name="deployment_dispositions" rows="3" placeholder="Portal|/repo=deployed:verified live version"></textarea>
+          </label>
+          <label>
+            <span>Evidence</span>
+            <textarea name="evidence" rows="3" placeholder="logs, screenshots, reproduction notes, or observed behavior"></textarea>
+          </label>
+          <label class="checkbox-field">
+            <input name="archived" type="checkbox">
+            <span>Archived</span>
+          </label>
+        </details>
         <section id="card-comments-section" class="comments-section">
           <div class="section-header">
             <h3>Notes</h3>

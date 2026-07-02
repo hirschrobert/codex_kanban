@@ -47,6 +47,27 @@ python3 -m kanban_server.project reset --yes
 After a reset, register the desired projects again so they appear in the
 dashboard dropdown.
 
+## Startup Overview
+
+Agents should start with the lean workspace overview instead of a full board
+snapshot:
+
+```bash
+PYTHONPATH="$(pwd)" \
+python3 -m kanban_server.project overview \
+  --server-url http://127.0.0.1:8766 \
+  --cwd "$PWD" \
+  --repo "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" \
+  --register-if-missing
+```
+
+The overview resolves the current repo or ecosystem path to the registered
+board, lists non-archived cards with descriptions, includes affected registered
+project paths, and reports how many archived cards exist. Use
+`--archived-only` when older context may matter. `--register-if-missing` only
+auto-registers a single repo whose `AGENTS.md` opts into `codex-kanban`;
+ecosystems still need explicit repeated `--path` and `--instruction` values.
+
 ## Manual Dialogs
 
 The primary intake path is conversational: a human gives a feature request,
@@ -467,6 +488,8 @@ implementers on that project.
 - `GET /api/snapshot?board=<board_slug>`
 - `GET /api/snapshot?board=<board_slug>&archived_only=1`
 - `GET /api/snapshot?board=<board_slug>&include_archived=1`
+- `GET /api/overview?cwd=<path>&repo=<path>`
+- `GET /api/overview?cwd=<path>&archived_only=1`
 - `GET /api/projects`
 - `GET /api/events/stream?board=<board_slug>`
 - `GET /api/events/stream?board=<board_slug>&archived_only=1`

@@ -110,6 +110,10 @@
   color: var(--muted);
 }
 
+.affected-project-chip {
+  max-width: min(100%, 260px);
+}
+
 .card-title {
   margin: 0 0 8px;
   color: var(--text);

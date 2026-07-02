@@ -10,6 +10,7 @@ from .commands import (
     card_move,
     due_run,
     list_projects,
+    overview,
     participant_upsert,
     print_prompt,
     register,
@@ -90,7 +91,43 @@ def main(argv: list[str] | None = None) -> int:
     snapshot_parser = subparsers.add_parser("snapshot", help="Print a board snapshot.")
     _add_connection_arguments(snapshot_parser)
     snapshot_parser.add_argument("--board")
+    snapshot_parser.add_argument(
+        "--include-archived",
+        action="store_true",
+        help="Include archived cards in the snapshot.",
+    )
+    snapshot_parser.add_argument(
+        "--archived-only",
+        action="store_true",
+        help="Show only archived cards in the snapshot.",
+    )
     snapshot_parser.set_defaults(func=snapshot)
+
+    overview_parser = subparsers.add_parser(
+        "overview",
+        help="Print a lean project/card overview for agent startup.",
+    )
+    _add_connection_arguments(overview_parser)
+    overview_parser.add_argument("--board")
+    overview_parser.add_argument("--cwd", default=os.getcwd())
+    overview_parser.add_argument("--repo")
+    overview_parser.add_argument("--limit", type=int, default=0)
+    overview_parser.add_argument(
+        "--register-if-missing",
+        action="store_true",
+        help="Auto-register a single repo when AGENTS.md opts into codex-kanban.",
+    )
+    overview_parser.add_argument(
+        "--include-archived",
+        action="store_true",
+        help="Include archived cards in the overview.",
+    )
+    overview_parser.add_argument(
+        "--archived-only",
+        action="store_true",
+        help="Show only archived cards in the overview.",
+    )
+    overview_parser.set_defaults(func=overview)
 
     card_create_parser = subparsers.add_parser("card-create", help="Create a Kanban card.")
     _add_connection_arguments(card_create_parser)

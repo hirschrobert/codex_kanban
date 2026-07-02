@@ -187,6 +187,21 @@ function cardNoticeHtml(card) {
     .join("");
 }
 
+function affectedProjectChipsHtml(card) {
+  const affectedProjectPaths = Array.isArray(card.affected_project_paths)
+    ? card.affected_project_paths
+    : [];
+  const shown = affectedProjectPaths.slice(0, 3);
+  const overflow = affectedProjectPaths.length - shown.length;
+  return [
+    ...shown.map((item) => {
+      const label = affectedProjectPathText(item);
+      return `<span class="chip affected-project-chip" title="${escapeHtml(label)}">${escapeHtml(label)}</span>`;
+    }),
+    overflow > 0 ? `<span class="chip">+${overflow} ecosystem</span>` : "",
+  ].join("");
+}
+
 function renderCard(card) {
   const cardEl = document.createElement("article");
   cardEl.draggable = true;
@@ -243,6 +258,7 @@ function renderCard(card) {
         ${childCount ? `<span class="chip">${childCount} child${childCount === 1 ? "" : "ren"}</span>` : ""}
         ${affectedCount ? `<span class="chip">Affected: ${affectedCount}</span>` : ""}
         ${affectedProjectCount ? `<span class="chip">Ecosystem: ${affectedProjectCount}</span>` : ""}
+        ${affectedProjectChipsHtml(card)}
         ${deploymentCount ? `<span class="chip">Deploy: ${deploymentCount}</span>` : ""}
         ${card.target_branch ? `<span class="chip">${escapeHtml(card.target_branch)}</span>` : ""}
         ${card.feature_branch ? `<span class="chip">${escapeHtml(card.feature_branch)}</span>` : ""}

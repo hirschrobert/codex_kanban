@@ -301,26 +301,112 @@ class ProjectStoreMixin(_StoreMixinContract):
                 "board_slug": board_slug,
             }
 
-    def project_for_path(self, path: str | Path) -> dict[str, Any] | None:
-        query_path = Path(path).resolve()
+    def resolve_project_for_paths(self, paths: list[str | Path]) -> dict[str, Any]:
+        query_paths: list[Path] = []
+        seen_query_paths: set[str] = set()
+        for path in paths:
+            if not str(path).strip():
+                continue
+            query_path = Path(path).expanduser().resolve()
+            query_key = str(query_path)
+            if query_key in seen_query_paths:
+                continue
+            seen_query_paths.add(query_key)
+            query_paths.append(query_path)
         with self._lock, self._connect() as conn:
             projects = self._list_projects(conn, include_removed=False)
-        best: tuple[int, dict[str, Any]] | None = None
-        for project in projects:
-            candidates = [project.get("root_path") or ""]
-            candidates.extend(item.get("path", "") for item in project.get("paths", []))
-            for candidate in candidates:
-                if not candidate:
-                    continue
-                try:
-                    candidate_path = Path(candidate).resolve()
-                    query_path.relative_to(candidate_path)
-                except ValueError:
-                    continue
-                score = len(candidate_path.parts)
-                if best is None or score > best[0]:
-                    best = (score, project)
-        return best[1] if best else None
+
+        matches: list[dict[str, Any]] = []
+        winning_project_slugs: set[str] = set()
+        ambiguous = False
+        ambiguity_reason = ""
+        for query_path in query_paths:
+            query_matches: list[dict[str, Any]] = []
+            for project in projects:
+                for candidate in self._project_path_candidates(project):
+                    candidate_path = Path(candidate["path"]).expanduser().resolve()
+                    try:
+                        query_path.relative_to(candidate_path)
+                    except ValueError:
+                        continue
+                    query_matches.append(
+                        {
+                            "project": project,
+                            "project_slug": project.get("slug"),
+                            "board_slug": project.get("board_slug"),
+                            "display_name": project.get("display_name"),
+                            "query_path": str(query_path),
+                            "matched_path": str(candidate_path),
+                            "label": candidate["label"],
+                            "score": len(candidate_path.parts),
+                        }
+                    )
+            matches.extend(query_matches)
+            if not query_matches:
+                continue
+            best_score = max(int(match["score"]) for match in query_matches)
+            winners = [match for match in query_matches if int(match["score"]) == best_score]
+            winner_slugs = {str(match["project_slug"]) for match in winners}
+            if len(winner_slugs) > 1:
+                ambiguous = True
+                ambiguity_reason = (
+                    "More than one registered project path matched the workspace equally."
+                )
+                winning_project_slugs.update(winner_slugs)
+                continue
+            winning_project_slugs.add(next(iter(winner_slugs)))
+
+        if len(winning_project_slugs) > 1:
+            ambiguous = True
+            ambiguity_reason = (
+                ambiguity_reason or "Workspace paths resolved to more than one registered project."
+            )
+
+        project = None
+        if len(winning_project_slugs) == 1 and not ambiguous:
+            slug = next(iter(winning_project_slugs))
+            project = next((item for item in projects if item.get("slug") == slug), None)
+
+        public_matches = [
+            {key: value for key, value in match.items() if key != "project"} for match in matches
+        ]
+        return {
+            "project": project,
+            "matches": public_matches,
+            "ambiguous": ambiguous,
+            "ambiguity_reason": ambiguity_reason,
+        }
+
+    def project_for_path(self, path: str | Path) -> dict[str, Any] | None:
+        return self.resolve_project_for_paths([path])["project"]
+
+    @staticmethod
+    def _project_path_candidates(project: dict[str, Any]) -> list[dict[str, str]]:
+        candidates: list[dict[str, str]] = []
+        seen_paths: set[str] = set()
+
+        def add_candidate(label: str, path: str) -> None:
+            if not path:
+                return
+            path_key = str(Path(path).expanduser().resolve())
+            if path_key in seen_paths:
+                return
+            seen_paths.add(path_key)
+            candidates.append({"label": label, "path": path})
+
+        for item in project.get("paths", []):
+            if isinstance(item, dict):
+                path = str(item.get("path") or "").strip()
+                label = str(item.get("label") or project.get("display_name") or path)
+            else:
+                path = str(item or "").strip()
+                label = str(project.get("display_name") or path)
+            add_candidate(label, path)
+        add_candidate(
+            str(project.get("display_name") or project.get("slug") or "root"),
+            str(project.get("root_path") or "").strip(),
+        )
+        return candidates
 
     def _seed_project_agents(
         self, conn: sqlite3.Connection, board_slug: str, agent_profiles: list[Any]

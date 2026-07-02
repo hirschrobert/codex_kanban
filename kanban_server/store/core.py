@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .cards import CardStoreMixin
 from .dependencies import DependencyStoreMixin
+from .overview import OverviewStoreMixin
 from .participants import ParticipantEventStoreMixin
 from .projects import ProjectStoreMixin
 from .schema import SchemaStoreMixin
@@ -16,6 +17,7 @@ from .workflows import WorkflowStoreMixin
 class KanbanStore(
     SchemaStoreMixin,
     ProjectStoreMixin,
+    OverviewStoreMixin,
     CardStoreMixin,
     ParticipantEventStoreMixin,
     WorkflowStoreMixin,

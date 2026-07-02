@@ -65,6 +65,30 @@ textarea {
   resize: vertical;
 }
 
+.card-description-input {
+  min-height: 240px;
+}
+
+.advanced-card-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.advanced-card-fields > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.advanced-card-fields[open] > summary {
+  margin-bottom: 12px;
+}
+
 .settings-project-list {
   display: flex;
   flex-direction: column;

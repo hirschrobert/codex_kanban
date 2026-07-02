@@ -25,10 +25,13 @@ For command details and longer examples, see `docs/codex-kanban.md`.
 ## First Move
 
 1. Read the current repo `AGENTS.md`, then nearest nested `AGENTS.md`.
-2. Find or register the project board. Prefer
-   `${CODEX_KANBAN_URL:-http://127.0.0.1:8766}`; direct SQLite fallback is OK.
-3. Inspect the board before work. Human-added cards are authoritative unless
-   the user redirects the task.
+2. Find or register the project board. First use registered projects/current
+   cwd matching; ecosystems match any registered app, repo, or worktree path.
+   Prefer `${CODEX_KANBAN_URL:-http://127.0.0.1:8766}`; direct SQLite fallback
+   is OK.
+3. Inspect a lean non-archived card overview before work. Human-added cards
+   are authoritative unless the user redirects the task. Remember archived
+   cards may exist and may need a separate archived search for older context.
 4. Select the relevant card or create one if none fits.
 5. Record start, block, handoff, finish, and delegated feedback through the
    ingester, CLI, or HTTP API.
@@ -61,10 +64,15 @@ context, add a card comment. If it is separate work, create a child card.
 Use the project CLI when possible:
 
 ```bash
-PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.project snapshot \
+PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.project overview \
   --server-url "${CODEX_KANBAN_URL:-http://127.0.0.1:8766}" \
-  --board <board>
+  --cwd "$PWD" \
+  --repo "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" \
+  --register-if-missing
 ```
+
+Use full `snapshot` only when you need events, participants, comments, or
+archived-inclusive board state.
 
 ```bash
 PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.project card-create \

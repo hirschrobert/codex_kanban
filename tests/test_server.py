@@ -660,6 +660,67 @@ class ServerDefaultsTest(unittest.TestCase):
             self.assertTrue(any(item["id"] == card["id"] for item in archived_only["cards"]))
             self.assertFalse(any(item["id"] == active["id"] for item in archived_only["cards"]))
 
+    def test_overview_resolves_workspace_and_reports_archived_hint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = KanbanStore(Path(tmp) / "kanban.sqlite3")
+            project = store.register_project(
+                {
+                    "slug": "demo",
+                    "display_name": "Demo",
+                    "board_slug": "demo",
+                    "card_prefix": "DM",
+                    "root_path": "/workspace",
+                    "paths": [{"label": "Portal", "path": "/workspace/portal"}],
+                }
+            )
+            active = store.create_card(
+                {
+                    "board_slug": project["board_slug"],
+                    "title": "Visible overview card",
+                    "description": "Description travels in the lean overview.",
+                    "affected_paths": ["/workspace/portal/src/App.jsx"],
+                }
+            )
+            archived = store.create_card(
+                {
+                    "board_slug": project["board_slug"],
+                    "title": "Archived card",
+                    "description": "Hidden by default.",
+                    "archived": True,
+                }
+            )
+            httpd = self.start_server(store)
+
+            with urllib.request.urlopen(
+                (
+                    f"http://127.0.0.1:{httpd.server_address[1]}"
+                    "/api/overview?cwd=/workspace/portal/src"
+                ),
+                timeout=3,
+            ) as response:
+                overview = json.loads(response.read().decode("utf-8"))
+
+            self.assertEqual(overview["matched_project"]["slug"], "demo")
+            self.assertEqual(overview["board"]["slug"], "demo")
+            self.assertEqual(overview["archived_card_count"], 1)
+            self.assertTrue(overview["archived_cards_hidden"])
+            self.assertEqual([card["id"] for card in overview["cards"]], [active["id"]])
+            self.assertEqual(
+                overview["cards"][0]["affected_project_paths"][0]["label"],
+                "Portal",
+            )
+
+            with urllib.request.urlopen(
+                (
+                    f"http://127.0.0.1:{httpd.server_address[1]}"
+                    "/api/overview?cwd=/workspace/portal/src&archived_only=1"
+                ),
+                timeout=3,
+            ) as response:
+                archived_only = json.loads(response.read().decode("utf-8"))
+
+            self.assertEqual([card["id"] for card in archived_only["cards"]], [archived["id"]])
+
 
 if __name__ == "__main__":
     unittest.main()

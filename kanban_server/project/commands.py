@@ -19,6 +19,7 @@ from .payloads import (
     _registration_payload,
     _workflow_payload,
 )
+from .registration import auto_register_payload_for_cwd
 
 CODEX_KANBAN_REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -50,9 +51,18 @@ def list_projects(args: argparse.Namespace) -> int:
 
 
 def snapshot(args: argparse.Namespace) -> int:
+    query = {
+        key: value
+        for key, value in {
+            "board": args.board,
+            "include_archived": "1" if args.include_archived else None,
+            "archived_only": "1" if args.archived_only else None,
+        }.items()
+        if value
+    }
     path = "/api/snapshot"
-    if args.board:
-        path += "?" + urllib.parse.urlencode({"board": args.board})
+    if query:
+        path += "?" + urllib.parse.urlencode(query)
     if args.server_url:
         result = _request_json(args.server_url, path)
         if result is not None:
@@ -60,7 +70,72 @@ def snapshot(args: argparse.Namespace) -> int:
             return 0
 
     store = KanbanStore(args.db)
-    _print_json(store.snapshot(args.board or None))
+    _print_json(
+        store.snapshot(
+            args.board or None,
+            include_archived=args.include_archived,
+            archived_only=args.archived_only,
+        )
+    )
+    return 0
+
+
+def overview(args: argparse.Namespace) -> int:
+    query = {
+        key: value
+        for key, value in {
+            "board": args.board,
+            "cwd": str(Path(args.cwd).expanduser().resolve()) if args.cwd else None,
+            "repo": str(Path(args.repo).expanduser().resolve()) if args.repo else None,
+            "limit": str(args.limit) if args.limit else None,
+            "include_archived": "1" if args.include_archived else None,
+            "archived_only": "1" if args.archived_only else None,
+            "register_if_missing": "1" if args.register_if_missing else None,
+        }.items()
+        if value
+    }
+    path = "/api/overview"
+    if query:
+        path += "?" + urllib.parse.urlencode(query)
+    if args.server_url:
+        result = _request_json(args.server_url, path)
+        if result is not None:
+            _print_json(result)
+            return 0
+
+    store = KanbanStore(args.db)
+    result = store.overview(
+        args.board or None,
+        cwd=query.get("cwd"),
+        repo=query.get("repo"),
+        include_archived=args.include_archived,
+        archived_only=args.archived_only,
+        limit=args.limit,
+    )
+    if (
+        args.register_if_missing
+        and not args.board
+        and not result.get("matched_project")
+        and not (result.get("project_resolution") or {}).get("ambiguous")
+    ):
+        registration_target = query.get("repo") or query.get("cwd")
+        payload = (
+            auto_register_payload_for_cwd(registration_target) if registration_target else None
+        )
+        if payload:
+            result["registered_project"] = store.register_project(payload)
+            result = {
+                **store.overview(
+                    args.board or None,
+                    cwd=query.get("cwd"),
+                    repo=query.get("repo"),
+                    include_archived=args.include_archived,
+                    archived_only=args.archived_only,
+                    limit=args.limit,
+                ),
+                "registered_project": result["registered_project"],
+            }
+    _print_json(result)
     return 0
 
 
@@ -205,6 +280,17 @@ PYTHONPATH={CODEX_KANBAN_REPO_ROOT} python3 -m kanban_server.project register \\
 After registration, use board `{slug}` as the shared orchestration surface.
 Use the `codex-kanban` skill to respect human-added cards, work only on the
 assigned card/scope, and delegate to the reusable agent profiles: {profiles}.
+For first overview, run:
+
+PYTHONPATH={CODEX_KANBAN_REPO_ROOT} python3 -m kanban_server.project overview \\
+  --server-url http://127.0.0.1:8766 \\
+  --cwd {root} \\
+  --repo {root} \\
+  --register-if-missing
+
+This identifies the matching board from registered project paths, lists
+non-archived cards with descriptions, and reports whether archived cards exist
+for possible follow-up search.
 This is an explicit request for coordinated subagent delegation when feasible
 and safe: create/update the relevant cards, use board-scoped participant IDs,
 respect active-agent limits, and avoid overlapping write scopes.

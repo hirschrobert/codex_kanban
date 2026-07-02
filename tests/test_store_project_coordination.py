@@ -103,6 +103,148 @@ class KanbanStoreProjectCoordinationTest(unittest.TestCase):
             ],
         )
 
+    def test_overview_matches_workspace_and_hides_archived_cards(self) -> None:
+        store = self.make_store()
+        project = store.register_project(
+            {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "card_prefix": "DM",
+                "root_path": "/workspace",
+                "paths": [
+                    {"label": "Portal", "path": "/workspace/portal"},
+                    {"label": "Backend", "path": "/workspace/backend"},
+                ],
+            }
+        )
+        active = store.create_card(
+            {
+                "board_slug": project["board_slug"],
+                "title": "Ship ecosystem change",
+                "description": "Card descriptions are present in startup overview.",
+                "status": "in_progress",
+                "target_repo": "/workspace/backend",
+                "target_branch": "release/1.0",
+                "affected_paths": ["/workspace/portal/src/App.jsx"],
+            }
+        )
+        store.add_card_comment(
+            active["id"],
+            {
+                "body": "Delegated feedback should be visible as a count.",
+                "author_name": "project_reviewer",
+                "author_kind": "agent",
+            },
+        )
+        archived = store.create_card(
+            {
+                "board_slug": project["board_slug"],
+                "title": "Old context",
+                "description": "Hidden by default.",
+                "archived": True,
+            }
+        )
+
+        overview = store.overview(cwd="/workspace/portal/src", repo="/workspace")
+        cards_by_id = {card["id"]: card for card in overview["cards"]}
+
+        self.assertEqual(overview["matched_project"]["slug"], "demo")
+        self.assertEqual(overview["board"]["slug"], "demo")
+        self.assertEqual(overview["archived_card_count"], 1)
+        self.assertTrue(overview["archived_cards_hidden"])
+        self.assertIn("archived", overview["archived_notice"])
+        self.assertIn(active["id"], cards_by_id)
+        self.assertNotIn(archived["id"], cards_by_id)
+        self.assertEqual(
+            cards_by_id[active["id"]]["description"],
+            "Card descriptions are present in startup overview.",
+        )
+        self.assertEqual(cards_by_id[active["id"]]["comment_count"], 1)
+        self.assertNotIn("comments", cards_by_id[active["id"]])
+        self.assertEqual(
+            [entry["label"] for entry in cards_by_id[active["id"]]["affected_project_paths"]],
+            ["Portal", "Backend"],
+        )
+
+        archived_only = store.overview("demo", archived_only=True)
+
+        self.assertEqual([card["id"] for card in archived_only["cards"]], [archived["id"]])
+        self.assertFalse(archived_only["archived_cards_hidden"])
+
+    def test_overview_reports_ambiguous_workspace_matches(self) -> None:
+        store = self.make_store()
+        store.register_project(
+            {
+                "slug": "alpha",
+                "display_name": "Alpha",
+                "board_slug": "alpha",
+                "card_prefix": "A",
+                "root_path": "/workspace/shared",
+            }
+        )
+        store.register_project(
+            {
+                "slug": "beta",
+                "display_name": "Beta",
+                "board_slug": "beta",
+                "card_prefix": "B",
+                "root_path": "/workspace/shared",
+            }
+        )
+
+        overview = store.overview(cwd="/workspace/shared/src")
+
+        self.assertIsNone(overview["matched_project"])
+        self.assertTrue(overview["project_resolution"]["ambiguous"])
+        self.assertIn("explicit board", overview["registration_hint"])
+
+    def test_overview_uses_explicit_board_when_workspace_match_is_ambiguous(self) -> None:
+        store = self.make_store()
+        store.register_project(
+            {
+                "slug": "alpha",
+                "display_name": "Alpha",
+                "board_slug": "alpha",
+                "card_prefix": "A",
+                "root_path": "/workspace/shared",
+            }
+        )
+        store.register_project(
+            {
+                "slug": "beta",
+                "display_name": "Beta",
+                "board_slug": "beta",
+                "card_prefix": "B",
+                "root_path": "/workspace/shared",
+            }
+        )
+
+        overview = store.overview("alpha", cwd="/workspace/shared/src")
+
+        self.assertEqual(overview["board"]["slug"], "alpha")
+        self.assertTrue(overview["project_resolution"]["ambiguous"])
+        self.assertIn("Using explicit board 'alpha'", overview["registration_hint"])
+        self.assertNotIn("Pass an explicit board", overview["registration_hint"])
+
+    def test_overview_ignores_removed_project_matches(self) -> None:
+        store = self.make_store()
+        store.register_project(
+            {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "card_prefix": "DM",
+                "root_path": "/tmp/demo",
+            }
+        )
+        store.remove_project("demo")
+
+        overview = store.overview(cwd="/tmp/demo/src")
+
+        self.assertIsNone(overview["matched_project"])
+        self.assertIn("No registered project path matched", overview["registration_hint"])
+
     def test_register_project_seeds_expanded_default_agent_profiles(self) -> None:
         store = self.make_store()
         project = store.register_project(
