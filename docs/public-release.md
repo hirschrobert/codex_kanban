@@ -19,21 +19,18 @@ deployment dispositions for anything production-facing.
 
 Push only explicit release refs, the approved `main` release-merge
 fast-forward ref, and release tags. Feature, fix, and release metadata commits
-stay on `release/<version>`. After release-branch CI passes on the release tip,
-create a visible no-fast-forward release merge commit from the current public
-`main` and the release branch, then run CI on that exact merge commit before
-`main` moves:
+stay on `release/<version>`. Create the visible no-fast-forward release merge
+commit locally before the first public push for that release, then push that
+merge commit to the release branch once. CI should run once on the exact merge
+SHA that will later fast-forward `main`:
 
 ```bash
-version=0.1.6
+version=0.1.7
 release_branch="release/${version}"
 
-git push origin "refs/heads/${release_branch}:refs/heads/${release_branch}"
-# Wait for CI to pass on the release branch tip.
-
-git fetch origin main "${release_branch}"
+git fetch origin main
 git switch --detach origin/main
-git merge --no-ff --no-edit "origin/${release_branch}"
+git merge --no-ff -m "Merge ${release_branch} into main" "${release_branch}"
 merge_sha="$(git rev-parse HEAD)"
 
 git branch -f "${release_branch}" "${merge_sha}"
@@ -46,6 +43,35 @@ git push origin "refs/tags/v${version}:refs/tags/v${version}"
 git branch -f main "${merge_sha}"
 git switch main
 ```
+
+For a public repository, no `gh` dependency is required to wait for the
+release-branch CI gate. You can use the GitHub Actions page, or poll the REST
+API with `curl` and Python's standard library:
+
+```bash
+repo="hirschrobert/codex_kanban"
+
+while :; do
+  read -r status conclusion url < <(
+    curl -fsS -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/${repo}/actions/runs?branch=${release_branch}&head_sha=${merge_sha}&event=push&per_page=1" \
+      | python3 -c 'import json, sys
+data = json.load(sys.stdin)
+runs = data.get("workflow_runs") or []
+run = runs[0] if runs else {}
+print(run.get("status", "missing"), run.get("conclusion") or "pending", run.get("html_url", ""))'
+  )
+  printf 'CI status: %s %s %s\n' "${status}" "${conclusion}" "${url}"
+  case "${status}:${conclusion}" in
+    completed:success) break ;;
+    completed:*) exit 1 ;;
+  esac
+  sleep 10
+done
+```
+
+For a private repository, add an `Authorization: Bearer ${GITHUB_TOKEN}` header
+to the `curl` command.
 
 Do not use `git push --mirror` or `git push --all` from a working repository
 that may contain development-only refs. If a clean public export is needed,
