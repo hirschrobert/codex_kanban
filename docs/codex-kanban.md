@@ -303,10 +303,15 @@ python3 -m kanban_server.project list \
 
 ```bash
 PYTHONPATH="$(pwd)" \
-python3 -m kanban_server.project snapshot \
+python3 -m kanban_server.project overview \
   --server-url http://127.0.0.1:8766 \
-  --board my-project
+  --cwd "$PWD" \
+  --repo "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" \
+  --register-if-missing
 ```
+
+Use `snapshot` when an agent needs full events, participants, comments, or an
+archived-inclusive board view.
 
 Create a human-readable card with concrete context:
 
@@ -585,6 +590,8 @@ Reusable profiles live in `.codex/agents/` in this repository, or
 Project-specific agents can still exist, but they should not be seeded on every
 board by default. The default CI/CD flow should use these abstract profiles and
 let each repo's `AGENTS.md` provide concrete commands and constraints.
+The packaged TOML definitions for these abstract profiles use GPT-5.5 in this
+release.
 
 For OpenAI or Codex documentation lookup, use the bundled OpenAI Docs
 skill/agent from Codex instead of registering a duplicate global profile.

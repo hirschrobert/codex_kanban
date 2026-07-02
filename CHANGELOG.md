@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.1.5 - 2026-07-02
+
+This release sharpens ecosystem coordination, reduces agent startup context
+load, adds a GitHub-facing README, and aligns bundled agent profiles with
+GPT-5.5.
+
+Public commits:
+
+- `17dc122` adds ecosystem affected-path/deployment-disposition tracking,
+  mirrors delegated-agent feedback into card comments, and tightens card
+  description guidance so later feedback becomes comments or child cards.
+- `8104cbb` adds the lean `overview` API/CLI startup contract, archive-aware
+  card listing, shared single-repo auto-registration helpers, and card UI
+  improvements for descriptions and ecosystem affected paths.
+- `dcca303` adds the missing default abstract agent TOMLs and pins all bundled
+  agent profiles to GPT-5.5.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog, README, and package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Added `GET /api/overview` and `python3 -m kanban_server.project overview`
+  so agents can resolve the current repo or ecosystem before reading active
+  non-archived cards.
+- Added CLI archive parity for snapshots and explicit archived-card hints in
+  overview output.
+- Added durable deployment dispositions and affected registered project paths
+  so ecosystem release/deploy work can record every affected app, repo, or
+  worktree.
+- Mirrored delegated-agent feedback events into card comments for card owners.
+- Improved the card dialog with a taller description field, compact visible
+  fields, and secondary coordination fields behind a `More fields` toggle.
+- Displayed affected ecosystem path chips directly on cards.
+- Added GPT-5.5 TOML definitions for all default abstract agent profiles.
+- Added this GitHub README and refreshed docs for overview-first startup.
+
+AI disclosure:
+
+This release was developed with help from AI agents using GPT-5.5, coordinated
+through the Codex Kanban workflow.
+
 ## 0.1.4 - 2026-07-01
 
 This release makes dashboard startup failures more human-friendly when the
