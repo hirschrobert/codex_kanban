@@ -29,17 +29,27 @@ For command details and longer examples, see `docs/codex-kanban.md`.
    cwd matching; ecosystems match any registered app, repo, or worktree path.
    Prefer `${CODEX_KANBAN_URL:-http://127.0.0.1:8766}`; direct SQLite fallback
    is OK.
-3. Inspect a lean non-archived card overview before work. Human-added cards
+3. Refresh board-scoped AI agents from current generic defaults and
+   discoverable project-local profiles. The startup overview command below does
+   this and updates the dashboard people/assignee lists.
+4. Inspect a lean non-archived card overview before work. Human-added cards
    are authoritative unless the user redirects the task. Remember archived
    cards may exist and may need a separate archived search for older context.
-4. Select the relevant card or create one if none fits.
-5. Record start, block, handoff, finish, and delegated feedback through the
+5. Select the relevant card or create one if none fits.
+6. Record start, block, handoff, finish, and delegated feedback through the
    ingester, CLI, or HTTP API.
 
 ## Intake
 
 Human requests should become durable cards with enough context for another
 agent to continue without the chat transcript.
+
+Split multi-intent requests before implementation starts. If one human message
+contains independent features, fixes, apps, repos, user roles, UI flows, or
+deployment scopes, create separate task cards. Use a parent coordination card
+plus child cards when the work shares one release or branch context; otherwise
+use sibling cards. Do not make one implementation card whose title or
+description bundles unrelated deliverables.
 
 Prefer these metadata fields when known:
 
@@ -57,7 +67,8 @@ For non-trivial card descriptions, use one clean rationale block:
 - `Acceptance criteria:`.
 
 Do not duplicate those headings. If later information is feedback or readiness
-context, add a card comment. If it is separate work, create a child card.
+context, add a card comment. If it is separate work, create a child card or a
+new sibling card before assigning implementation.
 
 ## Useful CLI Shapes
 
@@ -68,11 +79,15 @@ PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.project overview \
   --server-url "${CODEX_KANBAN_URL:-http://127.0.0.1:8766}" \
   --cwd "$PWD" \
   --repo "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" \
+  --done-limit 5 \
   --register-if-missing
 ```
 
 Use full `snapshot` only when you need events, participants, comments, or
-archived-inclusive board state.
+archived-inclusive board state. Use `--done-limit -1` only when completed-card
+history is needed; first overview should keep done-card history short. If the
+human asks to reload the `codex-kanban` skill, rerun the overview command so
+current generic/default and project-local agents are synced into the UI.
 
 ```bash
 PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.project card-create \
@@ -143,9 +158,18 @@ bypassing Kanban.
 
 ## Multi-Agent Work
 
-Use subagents when work naturally separates into independent implementation,
-review, release-readiness, documentation, or audit scopes. The main agent stays
-responsible for routing, integration, card hygiene, and final user summary.
+Use subagents when the user explicitly asks for subagents, delegation, or
+parallel agent work and the work naturally separates into independent
+implementation, review, release-readiness, documentation, or audit scopes. The
+main agent stays responsible for routing, integration, card hygiene, and final
+user summary.
+
+Current Codex environments may reject autonomous subagent spawning when the
+request is present only in a skill or repo instruction. If the user wants
+multi-agent execution, the user prompt should say so explicitly. If delegation
+is required but the tool is unavailable or disallowed, create/update the
+coordination cards and surface the blocker instead of silently doing delegated
+work in the parent context.
 
 Before delegating:
 

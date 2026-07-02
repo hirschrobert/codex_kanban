@@ -88,6 +88,7 @@ def overview(args: argparse.Namespace) -> int:
             "cwd": str(Path(args.cwd).expanduser().resolve()) if args.cwd else None,
             "repo": str(Path(args.repo).expanduser().resolve()) if args.repo else None,
             "limit": str(args.limit) if args.limit else None,
+            "done_limit": str(args.done_limit),
             "include_archived": "1" if args.include_archived else None,
             "archived_only": "1" if args.archived_only else None,
             "register_if_missing": "1" if args.register_if_missing else None,
@@ -111,6 +112,7 @@ def overview(args: argparse.Namespace) -> int:
         include_archived=args.include_archived,
         archived_only=args.archived_only,
         limit=args.limit,
+        done_limit=args.done_limit,
     )
     if (
         args.register_if_missing
@@ -132,6 +134,7 @@ def overview(args: argparse.Namespace) -> int:
                     include_archived=args.include_archived,
                     archived_only=args.archived_only,
                     limit=args.limit,
+                    done_limit=args.done_limit,
                 ),
                 "registered_project": result["registered_project"],
             }
@@ -286,14 +289,22 @@ PYTHONPATH={CODEX_KANBAN_REPO_ROOT} python3 -m kanban_server.project overview \\
   --server-url http://127.0.0.1:8766 \\
   --cwd {root} \\
   --repo {root} \\
+  --done-limit 5 \\
   --register-if-missing
 
 This identifies the matching board from registered project paths, lists
-non-archived cards with descriptions, and reports whether archived cards exist
-for possible follow-up search.
-This is an explicit request for coordinated subagent delegation when feasible
-and safe: create/update the relevant cards, use board-scoped participant IDs,
-respect active-agent limits, and avoid overlapping write scopes.
+all non-done non-archived cards plus the most recent done cards, and reports
+whether additional done or archived cards exist for possible follow-up search.
+It also refreshes board-scoped AI participants from current generic/default
+profiles and discoverable project-local agents so UI people fields stay
+current after agent defaults or project agents change.
+Split multi-intent human requests before implementation: independent features,
+fixes, affected apps/repos, user roles, UI flows, or deployment scopes should
+be separate sibling cards or child cards under a coordination parent, not one
+bundled implementation card.
+When asking Codex to use subagents, include an explicit user request for
+subagents, delegation, or parallel agent work. Current Codex environments may
+not treat skill or repo text alone as authorization to spawn subagents.
 
 Concrete project rules stay in this repo's AGENTS.md; do not copy domain rules
 into the global Kanban app.

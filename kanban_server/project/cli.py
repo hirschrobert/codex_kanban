@@ -4,7 +4,7 @@ import argparse
 import os
 from pathlib import Path
 
-from ..store.support import DEFAULT_DB_PATH
+from ..store.support import DEFAULT_DB_PATH, DEFAULT_OVERVIEW_DONE_LIMIT
 from .commands import (
     card_create,
     card_move,
@@ -112,6 +112,15 @@ def main(argv: list[str] | None = None) -> int:
     overview_parser.add_argument("--cwd", default=os.getcwd())
     overview_parser.add_argument("--repo")
     overview_parser.add_argument("--limit", type=int, default=0)
+    overview_parser.add_argument(
+        "--done-limit",
+        type=int,
+        default=DEFAULT_OVERVIEW_DONE_LIMIT,
+        help=(
+            "Maximum done cards to include in the startup overview. "
+            "Use 0 to hide done cards or -1 to include all done cards."
+        ),
+    )
     overview_parser.add_argument(
         "--register-if-missing",
         action="store_true",

@@ -4,7 +4,7 @@ import sqlite3
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from .support import slugify
+from .support import DEFAULT_OVERVIEW_DONE_LIMIT, slugify
 
 if TYPE_CHECKING:
     from .contracts import StoreMixinContract as _StoreMixinContract
@@ -24,6 +24,7 @@ class OverviewStoreMixin(_StoreMixinContract):
         include_archived: bool = False,
         archived_only: bool = False,
         limit: int = 0,
+        done_limit: int = DEFAULT_OVERVIEW_DONE_LIMIT,
     ) -> dict[str, Any]:
         resolution = self.resolve_project_for_paths([path for path in (cwd, repo) if path])
         matched_project = resolution["project"]
@@ -49,14 +50,19 @@ class OverviewStoreMixin(_StoreMixinContract):
                 (effective_board_slug,),
             )
             active_project = self._active_project_for_board(conn, effective_board_slug)
+            agent_refresh = None
+            if active_project:
+                agent_refresh = self._refresh_project_agents(conn, active_project)
+                active_project = agent_refresh["project"]
             projects = self._overview_projects(conn)
-            cards = self._overview_cards(
+            cards, done_card_count, done_cards_hidden_count = self._overview_cards(
                 conn,
                 effective_board_slug,
                 active_project=active_project,
                 include_archived=include_archived,
                 archived_only=archived_only,
                 limit=limit,
+                done_limit=done_limit,
             )
             archived_count = self._archived_card_count(conn, effective_board_slug)
             return {
@@ -65,8 +71,21 @@ class OverviewStoreMixin(_StoreMixinContract):
                 "project_resolution": resolution_payload,
                 "active_project": active_project,
                 "projects": projects,
+                "agent_profiles_refreshed": bool(agent_refresh),
+                "agent_profiles": (
+                    agent_refresh["agent_profiles"]
+                    if agent_refresh
+                    else active_project.get("agent_profiles", []) if active_project else []
+                ),
+                "agent_participant_ids": (
+                    agent_refresh["participant_ids"] if agent_refresh else []
+                ),
                 "cards": cards,
                 "card_count": len(cards),
+                "done_limit": done_limit,
+                "done_card_count": done_card_count,
+                "done_cards_hidden_count": done_cards_hidden_count,
+                "done_cards_hidden": done_cards_hidden_count > 0,
                 "archived_card_count": archived_count,
                 "archived_cards_hidden": bool(
                     archived_count and not include_archived and not archived_only
@@ -111,7 +130,8 @@ class OverviewStoreMixin(_StoreMixinContract):
         include_archived: bool,
         archived_only: bool,
         limit: int,
-    ) -> list[dict[str, Any]]:
+        done_limit: int,
+    ) -> tuple[list[dict[str, Any]], int, int]:
         archived_filter = self._archived_filter(
             include_archived=include_archived,
             archived_only=archived_only,
@@ -139,12 +159,43 @@ class OverviewStoreMixin(_StoreMixinContract):
             query += " LIMIT ?"
             params.append(limit)
         cards = [self._card_from_row(row) for row in conn.execute(query, params)]
+        cards, done_card_count, done_cards_hidden_count = self._limit_done_cards(
+            cards,
+            done_limit,
+        )
         participants = self._overview_participants(conn, board_slug)
         self._attach_dependency_links(conn, cards)
         self._attach_comment_counts(conn, cards)
         self._attach_affected_project_paths(cards, active_project)
         cards = self._cards_with_coordination(cards, participants)
-        return [self._overview_card(card) for card in cards]
+        return (
+            [self._overview_card(card) for card in cards],
+            done_card_count,
+            done_cards_hidden_count,
+        )
+
+    @staticmethod
+    def _limit_done_cards(
+        cards: list[dict[str, Any]],
+        done_limit: int,
+    ) -> tuple[list[dict[str, Any]], int, int]:
+        done_card_count = sum(1 for card in cards if card.get("status") == "done")
+        if done_limit < 0:
+            return cards, done_card_count, 0
+
+        limited: list[dict[str, Any]] = []
+        shown_done = 0
+        hidden_done = 0
+        for card in cards:
+            if card.get("status") != "done":
+                limited.append(card)
+                continue
+            if shown_done < done_limit:
+                limited.append(card)
+                shown_done += 1
+            else:
+                hidden_done += 1
+        return limited, done_card_count, hidden_done
 
     def _overview_participants(
         self,

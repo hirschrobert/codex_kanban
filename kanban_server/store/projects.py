@@ -5,12 +5,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .support import (
+    DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME,
+    DEFAULT_AI_AGENT_MANAGER_ROLE,
+    DEFAULT_AI_AGENT_MANAGER_SUFFIX,
     GENERIC_AGENT_PROFILES,
     MAX_ACTIVE_IMPLEMENTERS_PER_PROJECT,
     _json_dumps,
     _json_loads,
     _normalise_list,
     agent_profile_id,
+    discover_default_agent_profiles,
     discover_project_agent_profiles,
     merge_agent_profiles,
     slugify,
@@ -55,9 +59,10 @@ class ProjectStoreMixin(_StoreMixinContract):
             root_path = self._clean_text(payload.get("root_path")) or ""
             paths = _normalise_list(payload.get("paths"))
             instruction_paths = _normalise_list(payload.get("instruction_paths"))
-            agent_profiles = merge_agent_profiles(
-                payload.get("agent_profiles") or list(GENERIC_AGENT_PROFILES),
-                discover_project_agent_profiles(root_path, paths),
+            agent_profiles = self._project_agent_profiles(
+                root_path,
+                paths,
+                payload.get("agent_profiles"),
             )
             values = {
                 "slug": slug,
@@ -127,6 +132,14 @@ class ProjectStoreMixin(_StoreMixinContract):
         finally:
             if owns_conn:
                 active.close()
+
+    def refresh_project_agents(self, board_slug: str) -> dict[str, Any] | None:
+        board_slug = slugify(board_slug)
+        with self._lock, self._connect() as conn:
+            project = self._active_project_for_board(conn, board_slug)
+            if not project:
+                return None
+            return self._refresh_project_agents(conn, project)
 
     def default_board_slug(self) -> str:
         with self._lock, self._connect() as conn:
@@ -413,6 +426,9 @@ class ProjectStoreMixin(_StoreMixinContract):
     ) -> None:
         now = utc_now()
         participant_ids: set[str] = set()
+        manager_id = slugify(f"{board_slug}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}")
+        participant_ids.add(manager_id)
+        self._seed_project_agent_manager(conn, board_slug, manager_id, now)
         for profile in agent_profiles:
             profile_name = agent_profile_id(profile)
             if not profile_name:
@@ -448,6 +464,37 @@ class ProjectStoreMixin(_StoreMixinContract):
             )
         self._prune_removed_project_agents(conn, board_slug, participant_ids)
 
+    @staticmethod
+    def _seed_project_agent_manager(
+        conn: sqlite3.Connection,
+        board_slug: str,
+        manager_id: str,
+        now: str,
+    ) -> None:
+        conn.execute(
+            """
+            INSERT INTO participants (
+                id, kind, display_name, role, status, current_board_slug,
+                current_scope, last_seen_at, created_at, updated_at
+            )
+            VALUES (?, 'agent', ?, ?, 'idle', ?, '', ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                display_name = excluded.display_name,
+                role = excluded.role,
+                current_board_slug = excluded.current_board_slug,
+                updated_at = excluded.updated_at
+            """,
+            (
+                manager_id,
+                DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME,
+                DEFAULT_AI_AGENT_MANAGER_ROLE,
+                board_slug,
+                now,
+                now,
+                now,
+            ),
+        )
+
     def _prune_removed_project_agents(
         self, conn: sqlite3.Connection, board_slug: str, participant_ids: set[str]
     ) -> None:
@@ -467,4 +514,55 @@ class ProjectStoreMixin(_StoreMixinContract):
               {extra_filter}
             """,
             params,
+        )
+
+    def _refresh_project_agents(
+        self,
+        conn: sqlite3.Connection,
+        project: dict[str, Any],
+    ) -> dict[str, Any]:
+        board_slug = str(project["board_slug"])
+        agent_profiles = self._project_agent_profiles(
+            project.get("root_path"),
+            project.get("paths", []),
+            project.get("agent_profiles", []),
+        )
+        now = utc_now()
+        conn.execute(
+            """
+            UPDATE projects
+            SET agent_profiles = ?, updated_at = ?
+            WHERE slug = ?
+            """,
+            (_json_dumps(agent_profiles), now, project["slug"]),
+        )
+        self._seed_project_agents(conn, board_slug, agent_profiles)
+        row = self._one(conn, "SELECT * FROM projects WHERE slug = ?", (project["slug"],))
+        refreshed = self._project_from_row(row)
+        if not refreshed:
+            raise KeyError(f"project {project['slug']} not found")
+        return {
+            "project": refreshed,
+            "agent_profiles": agent_profiles,
+            "participant_ids": [
+                slugify(f"{board_slug}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}"),
+                *(
+                    slugify(f"{board_slug}-{profile}")
+                    for profile in agent_profiles
+                    if agent_profile_id(profile)
+                ),
+            ],
+        }
+
+    @staticmethod
+    def _project_agent_profiles(
+        root_path: str | Path | None,
+        paths: list[Any] | None,
+        *groups: Any,
+    ) -> list[str]:
+        return merge_agent_profiles(
+            list(GENERIC_AGENT_PROFILES),
+            discover_default_agent_profiles(),
+            *groups,
+            discover_project_agent_profiles(root_path, paths),
         )

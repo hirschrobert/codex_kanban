@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from .app_metadata import app_metadata as current_app_metadata
 from .project.registration import auto_register_payload_for_cwd
 from .store.core import KanbanStore
-from .store.support import DEFAULT_DB_PATH
+from .store.support import DEFAULT_DB_PATH, DEFAULT_OVERVIEW_DONE_LIMIT
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 DEFAULT_HOST = "127.0.0.1"
@@ -346,6 +346,11 @@ class KanbanHandler(BaseHTTPRequestHandler):
                 include_archived = self._truthy_query(query, "include_archived")
                 archived_only = self._truthy_query(query, "archived_only")
                 limit = self._int_query(query, "limit")
+                done_limit = self._int_query(
+                    query,
+                    "done_limit",
+                    default=DEFAULT_OVERVIEW_DONE_LIMIT,
+                )
                 result = self.kanban_server.store.overview(
                     board,
                     cwd=cwd,
@@ -353,6 +358,7 @@ class KanbanHandler(BaseHTTPRequestHandler):
                     include_archived=include_archived,
                     archived_only=archived_only,
                     limit=limit,
+                    done_limit=done_limit,
                 )
                 if (
                     self._truthy_query(query, "register_if_missing")
@@ -376,8 +382,11 @@ class KanbanHandler(BaseHTTPRequestHandler):
                             include_archived=include_archived,
                             archived_only=archived_only,
                             limit=limit,
+                            done_limit=done_limit,
                         )
                         result["registered_project"] = registered_project
+                if result.get("agent_profiles_refreshed") and result.get("board"):
+                    self._broadcast(result["board"]["slug"])
                 self._send_json(result)
                 return
             if parsed.path == "/api/workflows/due-cards":
@@ -431,11 +440,11 @@ class KanbanHandler(BaseHTTPRequestHandler):
         return query.get(key, ["0"])[0] in {"1", "true", "yes", "on"}
 
     @staticmethod
-    def _int_query(query: dict[str, list[str]], key: str) -> int:
+    def _int_query(query: dict[str, list[str]], key: str, *, default: int = 0) -> int:
         try:
-            return int(query.get(key, ["0"])[0])
+            return int(query.get(key, [str(default)])[0])
         except ValueError:
-            return 0
+            return default
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
@@ -739,6 +748,8 @@ class KanbanHandler(BaseHTTPRequestHandler):
         include_archived: bool = False,
         archived_only: bool = False,
     ) -> dict[str, Any]:
+        if board_slug:
+            self.kanban_server.store.refresh_project_agents(board_slug)
         snapshot = self.kanban_server.store.snapshot(
             board_slug,
             include_archived=include_archived,

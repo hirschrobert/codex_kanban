@@ -233,6 +233,48 @@ class ServerDefaultsTest(unittest.TestCase):
             self.assertEqual(body["board"]["slug"], "demo")
             self.assertEqual([card["title"] for card in body["cards"]], ["Visible card"])
 
+    def test_snapshot_refreshes_stale_agent_participants_for_ui(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "demo"
+            (root / "src").mkdir(parents=True)
+            agent_dir = root / ".codex" / "agents"
+            agent_dir.mkdir(parents=True)
+            (agent_dir / "qa-reviewer.toml").write_text(
+                'name = "qa_reviewer"\n',
+                encoding="utf-8",
+            )
+            store = KanbanStore(Path(tmp) / "kanban.sqlite3")
+            store.register_project(
+                {
+                    "slug": "demo",
+                    "display_name": "Demo",
+                    "board_slug": "demo",
+                    "card_prefix": "DM",
+                    "root_path": str(root),
+                }
+            )
+            with store._connect() as conn:
+                conn.execute(
+                    "UPDATE projects SET agent_profiles = ? WHERE slug = ?",
+                    (json.dumps(["project_implementer"]), "demo"),
+                )
+                conn.execute(
+                    "DELETE FROM participants WHERE id != ?",
+                    ("demo-project-implementer",),
+                )
+            httpd = self.start_server(store, default_board_slug="demo")
+
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{httpd.server_address[1]}/api/snapshot?board=demo",
+                timeout=3,
+            ) as response:
+                body = json.loads(response.read().decode("utf-8"))
+
+            participant_ids = {participant["id"] for participant in body["participants"]}
+            self.assertIn("demo-ai-agent-manager", participant_ids)
+            self.assertIn("demo-domain-model-steward", participant_ids)
+            self.assertIn("demo-qa-reviewer", participant_ids)
+
     def test_snapshot_includes_app_version_hash(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store = KanbanStore(Path(tmp) / "kanban.sqlite3")
@@ -720,6 +762,56 @@ class ServerDefaultsTest(unittest.TestCase):
                 archived_only = json.loads(response.read().decode("utf-8"))
 
             self.assertEqual([card["id"] for card in archived_only["cards"]], [archived["id"]])
+
+    def test_overview_done_limit_query_controls_completed_cards(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = KanbanStore(Path(tmp) / "kanban.sqlite3")
+            project = store.register_project(
+                {
+                    "slug": "demo",
+                    "display_name": "Demo",
+                    "board_slug": "demo",
+                    "card_prefix": "DM",
+                    "root_path": "/workspace",
+                }
+            )
+            active = store.create_card(
+                {
+                    "board_slug": project["board_slug"],
+                    "title": "Active overview card",
+                    "description": "Active card.",
+                    "status": "in_progress",
+                }
+            )
+            done_cards = [
+                store.create_card(
+                    {
+                        "board_slug": project["board_slug"],
+                        "title": f"Done card {index}",
+                        "description": "Done card.",
+                        "status": "done",
+                    }
+                )
+                for index in range(4)
+            ]
+            httpd = self.start_server(store)
+
+            with urllib.request.urlopen(
+                (
+                    f"http://127.0.0.1:{httpd.server_address[1]}"
+                    "/api/overview?board=demo&done_limit=2"
+                ),
+                timeout=3,
+            ) as response:
+                overview = json.loads(response.read().decode("utf-8"))
+
+            self.assertEqual(overview["done_card_count"], 4)
+            self.assertEqual(overview["done_cards_hidden_count"], 2)
+            self.assertIn(active["id"], [card["id"] for card in overview["cards"]])
+            self.assertEqual(
+                [card["id"] for card in overview["cards"] if card["status"] == "done"],
+                [card["id"] for card in reversed(done_cards[-2:])],
+            )
 
 
 if __name__ == "__main__":

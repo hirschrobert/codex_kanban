@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.1.8 - 2026-07-02
+
+This release tightens agent startup coordination, reduces first-overview noise,
+and keeps board people fields in sync with current AI agent profiles.
+
+Public commits:
+
+- `d95c3a9` adds `--done-limit` to the startup overview so active cards remain
+  visible while completed-card history is capped by default, and documents the
+  current explicit-subagent-request limitation.
+- `5a1d792` clarifies that multi-intent human requests should become separate
+  sibling cards or parent/child cards before implementation starts.
+- `aeca785` refreshes board-scoped AI participants during startup overview,
+  hook/session startup, and UI snapshot loading so current generic/default and
+  project-local agents appear in people, owner, assignee, and comment-writer
+  fields.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Limited done cards in first overview output while preserving all non-done
+  work categories and hidden-count hints.
+- Added guidance and generated prompt text to split independent features, fixes,
+  apps, roles, UI flows, or deployment scopes into separate cards.
+- Refreshed board participants from current default/generic agent definitions,
+  installed Codex agent files, registered project profiles, and project-local
+  `.codex/agents` on startup/reload.
+- Preserved and seeded the board-scoped AI agent manager alongside
+  profile-backed agents.
+
+AI disclosure:
+
+This release was developed with help from AI agents using GPT-5.5, coordinated
+through the Codex Kanban workflow.
+
 ## 0.1.7 - 2026-07-02
 
 This release simplifies the documented release integration gate so CI runs once

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from kanban_server.store import GENERIC_AGENT_PROFILES, KanbanStore
 
@@ -172,6 +174,56 @@ class KanbanStoreProjectCoordinationTest(unittest.TestCase):
         self.assertEqual([card["id"] for card in archived_only["cards"]], [archived["id"]])
         self.assertFalse(archived_only["archived_cards_hidden"])
 
+    def test_overview_limits_done_cards_by_default(self) -> None:
+        store = self.make_store()
+        self.register_demo_project(store)
+        active = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Active card",
+                "description": "Active cards remain visible.",
+                "status": "in_progress",
+            }
+        )
+        done_cards = [
+            store.create_card(
+                {
+                    "board_slug": "demo",
+                    "title": f"Done card {index}",
+                    "description": f"Completed work {index}.",
+                    "status": "done",
+                }
+            )
+            for index in range(7)
+        ]
+
+        overview = store.overview("demo")
+        overview_ids = [card["id"] for card in overview["cards"]]
+
+        self.assertIn(active["id"], overview_ids)
+        self.assertEqual(overview["done_limit"], 5)
+        self.assertEqual(overview["done_card_count"], 7)
+        self.assertEqual(overview["done_cards_hidden_count"], 2)
+        self.assertTrue(overview["done_cards_hidden"])
+        self.assertEqual(
+            [card["id"] for card in overview["cards"] if card["status"] == "done"],
+            [card["id"] for card in reversed(done_cards[-5:])],
+        )
+
+        without_done = store.overview("demo", done_limit=0)
+        self.assertEqual(
+            [card["id"] for card in without_done["cards"]],
+            [active["id"]],
+        )
+        self.assertEqual(without_done["done_cards_hidden_count"], 7)
+
+        all_done = store.overview("demo", done_limit=-1)
+        self.assertEqual(
+            [card["id"] for card in all_done["cards"] if card["status"] == "done"],
+            [card["id"] for card in reversed(done_cards)],
+        )
+        self.assertEqual(all_done["done_cards_hidden_count"], 0)
+
     def test_overview_reports_ambiguous_workspace_matches(self) -> None:
         store = self.make_store()
         store.register_project(
@@ -286,6 +338,79 @@ class KanbanStoreProjectCoordinationTest(unittest.TestCase):
 
         self.assertIn("accounting_steward", project["agent_profiles"])
         self.assertIn("demo-accounting-steward", agent_ids)
+
+    def test_overview_refreshes_stale_project_agent_participants(self) -> None:
+        store = self.make_store()
+        root = Path(self.tmp.name) / "demo"
+        (root / "src").mkdir(parents=True)
+        project = store.register_project(
+            {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "card_prefix": "DM",
+                "root_path": str(root),
+            }
+        )
+        agent_dir = root / ".codex" / "agents"
+        agent_dir.mkdir(parents=True)
+        (agent_dir / "qa-reviewer.toml").write_text(
+            'name = "qa_reviewer"\n',
+            encoding="utf-8",
+        )
+        with store._connect() as conn:
+            conn.execute(
+                "UPDATE projects SET agent_profiles = ? WHERE slug = ?",
+                (json.dumps(["project_implementer"]), project["slug"]),
+            )
+            conn.execute(
+                "DELETE FROM participants WHERE id != ?",
+                ("demo-project-implementer",),
+            )
+
+        overview = store.overview(cwd=str(root / "src"))
+        agent_ids = {participant["id"] for participant in store.snapshot("demo")["participants"]}
+
+        self.assertTrue(overview["agent_profiles_refreshed"])
+        self.assertIn("domain_model_steward", overview["agent_profiles"])
+        self.assertIn("qa_reviewer", overview["agent_profiles"])
+        self.assertIn("demo-ai-agent-manager", overview["agent_participant_ids"])
+        self.assertIn("demo-ai-agent-manager", agent_ids)
+        self.assertIn("demo-domain-model-steward", agent_ids)
+        self.assertIn("demo-qa-reviewer", agent_ids)
+
+    def test_overview_refresh_discovers_current_default_agent_files(self) -> None:
+        store = self.make_store()
+        codex_home = Path(self.tmp.name) / "codex-home"
+        agent_dir = codex_home / "agents"
+        agent_dir.mkdir(parents=True)
+        (agent_dir / "default-helper.toml").write_text(
+            'name = "default_helper"\n',
+            encoding="utf-8",
+        )
+        root = Path(self.tmp.name) / "demo"
+        (root / "src").mkdir(parents=True)
+        store.register_project(
+            {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "card_prefix": "DM",
+                "root_path": str(root),
+            }
+        )
+        with store._connect() as conn:
+            conn.execute(
+                "DELETE FROM participants WHERE id = ?",
+                ("demo-default-helper",),
+            )
+
+        with mock.patch.dict("os.environ", {"CODEX_HOME": str(codex_home)}):
+            overview = store.overview(cwd=str(root / "src"))
+
+        agent_ids = {participant["id"] for participant in store.snapshot("demo")["participants"]}
+        self.assertIn("default_helper", overview["agent_profiles"])
+        self.assertIn("demo-default-helper", agent_ids)
 
     def test_register_project_prunes_removed_seeded_agents(self) -> None:
         store = self.make_store()

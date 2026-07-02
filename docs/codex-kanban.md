@@ -58,15 +58,22 @@ python3 -m kanban_server.project overview \
   --server-url http://127.0.0.1:8766 \
   --cwd "$PWD" \
   --repo "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" \
+  --done-limit 5 \
   --register-if-missing
 ```
 
 The overview resolves the current repo or ecosystem path to the registered
-board, lists non-archived cards with descriptions, includes affected registered
-project paths, and reports how many archived cards exist. Use
-`--archived-only` when older context may matter. `--register-if-missing` only
+board, lists all non-done non-archived cards with descriptions, includes only
+the latest five done cards by default, includes affected registered project
+paths, and reports how many archived and done cards are hidden. Use
+`--done-limit -1` when completed-card history matters, and use `--archived-only`
+when older archived context may matter. `--register-if-missing` only
 auto-registers a single repo whose `AGENTS.md` opts into `codex-kanban`;
 ecosystems still need explicit repeated `--path` and `--instruction` values.
+The same overview also refreshes board-scoped AI participants from current
+generic/default profiles and discoverable project-local `.codex/agents`, so the
+dashboard people, owner, assignee, and comment-writer fields stay current after
+agent defaults or project agents change.
 
 ## Manual Dialogs
 
@@ -99,6 +106,13 @@ release/deploy checklist, for example
 `Backlog`, `Priority` defaults to `Normal`, `Repeat` defaults to `None`, and
 `Assignee` can stay unassigned until a human or agent takes the card. Branch,
 repo, SHA, blocker, and checks fields are for later handoffs or specialist work.
+
+Split multi-intent intake before implementation starts. If one human message
+contains independent features, fixes, apps, repos, user roles, UI flows, or
+deployment scopes, create separate task cards. Use a parent coordination card
+plus child cards when the tasks share one release or branch context; otherwise
+use sibling cards. One implementation card should not bundle unrelated
+deliverables just because they arrived in one prompt.
 
 Cards can also be linked as dependencies. A parent card depends on its child
 cards. In the generic dashboard policy, a parent cannot move into
@@ -151,7 +165,8 @@ chat transcript:
 
 Use either those headings in the description or the CLI `--why`, `--risk`, and
 `--acceptance` helpers. Do not use both for the same section; later feedback
-belongs in notes, and separate work belongs in a child card.
+belongs in notes, and separate work belongs in a child card or new sibling card
+before implementation is assigned.
 
 For a person, fill:
 
@@ -307,6 +322,7 @@ python3 -m kanban_server.project overview \
   --server-url http://127.0.0.1:8766 \
   --cwd "$PWD" \
   --repo "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" \
+  --done-limit 5 \
   --register-if-missing
 ```
 
@@ -538,6 +554,9 @@ checks, changed assumptions, and follow-up cards.
 Participating AI agents should:
 
 - check the selected board for human-added cards before starting work;
+- rerun the startup overview when a session starts or the human asks to reload
+  `codex-kanban`; this refreshes current generic/default and project-local AI
+  agents into the UI people fields before cards are assigned;
 - use board-scoped participant IDs such as
   `<board-slug>-project-implementer`; generic profile names are templates, not
   cross-project identities;
@@ -558,12 +577,9 @@ Participating AI agents should:
   integrated codebase takes priority over preserving local progress;
 - set the active card's target branch to the upcoming unreleased release branch,
   creating that release branch when needed instead of using `main` or `master`;
-- treat a user or repo instruction to use Codex Kanban, together with these
-  multi-agent workflow rules, as the explicit request for coordinated subagent
-  delegation required by Codex delegation tooling. Use that permission
-  proportionally: create/update the relevant cards first, use board-scoped
-  participant IDs, respect active-agent limits, and avoid overlapping write
-  scopes;
+- split multi-intent human requests into separate cards before implementation:
+  one feature plus one fix, different affected apps, different user roles, or
+  independent deployment scopes should not share one implementation card;
 - start review automatically after implementation cards complete when a
   delegation mechanism is available. The implementation agent should not leave a
   reviewer card merely `ready` unless no reviewer can be started;
@@ -580,6 +596,14 @@ Participating AI agents should:
   failures, changed assumptions, and follow-up cards in handoffs;
 - read the concrete project `AGENTS.md` files registered for the selected
   project.
+
+Current Codex subagent tooling may require the user prompt itself to explicitly
+ask for subagents, delegation, or parallel agent work; a skill or repo
+instruction alone may not be enough. This behavior is tracked in
+<https://github.com/openai/codex/issues/18994>. When a workflow needs
+subagents but the active Codex environment disallows spawning, record the
+coordination cards and surface the blocker instead of doing delegated work
+silently in the parent context.
 
 ## Abstract Agent Profiles
 

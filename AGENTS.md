@@ -9,10 +9,20 @@ human developers, the main AI agent, and optional AI subagents.
   release, registration, or multi-agent work. Skip Kanban for trivial command
   checks and keep exploratory discussion read-only until implementation is
   approved.
+- Startup overview and explicit `codex-kanban` reloads must refresh
+  board-scoped AI participants from the current generic/default profiles and
+  discoverable project-local profiles so UI people fields stay current.
+- Split multi-intent human requests before implementation starts. If one prompt
+  contains independent features, fixes, affected apps/repos, user roles, UI
+  flows, or deployment scopes, create separate sibling cards or a coordination
+  parent with child cards instead of one bundled implementation card.
 - For concrete multi-agent work, create one parent coordination card plus one
   linked child for the main implementer and each delegated subagent doing
   material work. Assign children to board-scoped participants and record
-  start/finish/handoff on those child cards.
+  start/finish/handoff on those child cards. Current Codex environments may
+  require the user prompt itself to explicitly request subagents, delegation, or
+  parallel agent work; if spawning is disallowed, record the cards and surface
+  the blocker instead of silently folding delegated work into the parent agent.
 - For ecosystem release/deploy work, record affected apps, repos, worktrees,
   and deployment dispositions before marking production deployment complete.
 - Keep this app abstract. Do not hardcode project-specific domains, agent names,

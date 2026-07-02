@@ -44,6 +44,27 @@ class ProjectCliTest(unittest.TestCase):
             project.main(args)
         return output.getvalue()
 
+    def test_project_prompt_instructs_split_multi_intent_intake(self) -> None:
+        self.make_db_path()
+        root = Path(self.tmp.name) / "demo"
+        root.mkdir()
+
+        output = self.capture_project_main(
+            [
+                "prompt",
+                "--root",
+                str(root),
+                "--display-name",
+                "Demo",
+            ]
+        )
+
+        self.assertIn("refreshes board-scoped AI participants", output)
+        self.assertIn("current generic/default", output)
+        self.assertIn("Split multi-intent human requests before implementation", output)
+        self.assertIn("separate sibling cards or child cards", output)
+        self.assertIn("bundled implementation card", output)
+
     def test_card_create_adds_human_context_sections(self) -> None:
         db_path = self.make_db_path()
         output = io.StringIO()
