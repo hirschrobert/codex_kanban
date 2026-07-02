@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.1.6 - 2026-07-02
+
+This release documents and validates a clearer release-branch integration flow
+for continuous development and CI transparency.
+
+Public commit:
+
+- `c80d03a` updates project release rules, the bundled Codex Kanban skill, and
+  public release docs so feature/fix commits remain grouped on
+  `release/<version>` and `main` advances through an explicit release merge
+  commit that has passed release-branch CI.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Required public releases to create a no-fast-forward release merge commit
+  whose first parent is the previous `main` and whose second parent is the
+  release branch tip.
+- Required the release merge commit to be pushed back to `release/<version>`
+  and pass CI before `main` fast-forwards to the same SHA.
+- Clarified allowed public refs: explicit release branches, the approved
+  `main` release-merge fast-forward ref, and release tags.
+- Added the release integration flow to the main Codex Kanban docs and public
+  release checklist.
+
+AI disclosure:
+
+This release was developed with help from AI agents using GPT-5.5, coordinated
+through the Codex Kanban workflow.
+
 ## 0.1.5 - 2026-07-02
 
 This release sharpens ecosystem coordination, reduces agent startup context
