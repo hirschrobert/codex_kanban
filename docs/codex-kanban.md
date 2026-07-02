@@ -103,6 +103,13 @@ release/deploy checklist, for example
 `Assignee` can stay unassigned until a human or agent takes the card. Branch,
 repo, SHA, blocker, and checks fields are for later handoffs or specialist work.
 
+Split multi-intent intake before implementation starts. If one human message
+contains independent features, fixes, apps, repos, user roles, UI flows, or
+deployment scopes, create separate task cards. Use a parent coordination card
+plus child cards when the tasks share one release or branch context; otherwise
+use sibling cards. One implementation card should not bundle unrelated
+deliverables just because they arrived in one prompt.
+
 Cards can also be linked as dependencies. A parent card depends on its child
 cards. In the generic dashboard policy, a parent cannot move into
 `in_progress`, `review`, or `done` until every child dependency is `done`.
@@ -154,7 +161,8 @@ chat transcript:
 
 Use either those headings in the description or the CLI `--why`, `--risk`, and
 `--acceptance` helpers. Do not use both for the same section; later feedback
-belongs in notes, and separate work belongs in a child card.
+belongs in notes, and separate work belongs in a child card or new sibling card
+before implementation is assigned.
 
 For a person, fill:
 
@@ -562,12 +570,9 @@ Participating AI agents should:
   integrated codebase takes priority over preserving local progress;
 - set the active card's target branch to the upcoming unreleased release branch,
   creating that release branch when needed instead of using `main` or `master`;
-- treat a user or repo instruction to use Codex Kanban, together with these
-  multi-agent workflow rules, as the explicit request for coordinated subagent
-  delegation required by Codex delegation tooling. Use that permission
-  proportionally: create/update the relevant cards first, use board-scoped
-  participant IDs, respect active-agent limits, and avoid overlapping write
-  scopes;
+- split multi-intent human requests into separate cards before implementation:
+  one feature plus one fix, different affected apps, different user roles, or
+  independent deployment scopes should not share one implementation card;
 - start review automatically after implementation cards complete when a
   delegation mechanism is available. The implementation agent should not leave a
   reviewer card merely `ready` unless no reviewer can be started;

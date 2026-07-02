@@ -9,6 +9,10 @@ human developers, the main AI agent, and optional AI subagents.
   release, registration, or multi-agent work. Skip Kanban for trivial command
   checks and keep exploratory discussion read-only until implementation is
   approved.
+- Split multi-intent human requests before implementation starts. If one prompt
+  contains independent features, fixes, affected apps/repos, user roles, UI
+  flows, or deployment scopes, create separate sibling cards or a coordination
+  parent with child cards instead of one bundled implementation card.
 - For concrete multi-agent work, create one parent coordination card plus one
   linked child for the main implementer and each delegated subagent doing
   material work. Assign children to board-scoped participants and record

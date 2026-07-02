@@ -41,6 +41,13 @@ For command details and longer examples, see `docs/codex-kanban.md`.
 Human requests should become durable cards with enough context for another
 agent to continue without the chat transcript.
 
+Split multi-intent requests before implementation starts. If one human message
+contains independent features, fixes, apps, repos, user roles, UI flows, or
+deployment scopes, create separate task cards. Use a parent coordination card
+plus child cards when the work shares one release or branch context; otherwise
+use sibling cards. Do not make one implementation card whose title or
+description bundles unrelated deliverables.
+
 Prefer these metadata fields when known:
 
 - `intake_kind`: `feature_request`, `error_report`, `coordination`,
@@ -57,7 +64,8 @@ For non-trivial card descriptions, use one clean rationale block:
 - `Acceptance criteria:`.
 
 Do not duplicate those headings. If later information is feedback or readiness
-context, add a card comment. If it is separate work, create a child card.
+context, add a card comment. If it is separate work, create a child card or a
+new sibling card before assigning implementation.
 
 ## Useful CLI Shapes
 

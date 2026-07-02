@@ -295,6 +295,10 @@ PYTHONPATH={CODEX_KANBAN_REPO_ROOT} python3 -m kanban_server.project overview \\
 This identifies the matching board from registered project paths, lists
 all non-done non-archived cards plus the most recent done cards, and reports
 whether additional done or archived cards exist for possible follow-up search.
+Split multi-intent human requests before implementation: independent features,
+fixes, affected apps/repos, user roles, UI flows, or deployment scopes should
+be separate sibling cards or child cards under a coordination parent, not one
+bundled implementation card.
 When asking Codex to use subagents, include an explicit user request for
 subagents, delegation, or parallel agent work. Current Codex environments may
 not treat skill or repo text alone as authorization to spawn subagents.
