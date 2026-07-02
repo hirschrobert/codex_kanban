@@ -162,6 +162,21 @@ def _auto_register_project(
     return store.register_project(payload)
 
 
+def _refresh_project_agents(
+    store: KanbanStore,
+    project: dict[str, Any] | None,
+    server_url: str,
+) -> dict[str, Any] | None:
+    if not project:
+        return None
+    if server_url:
+        refreshed = _post_json_result(server_url, "/api/projects", project)
+        if refreshed:
+            return refreshed
+    result = store.refresh_project_agents(project["board_slug"])
+    return result["project"] if result else project
+
+
 def _context_message(project: dict[str, Any], board_slug: str) -> str:
     instructions = ", ".join(project.get("instruction_paths", []))
     profiles = ", ".join(project.get("agent_profiles", []))
@@ -212,6 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         project = _project_for_board(store, board_slug) or project
     else:
         board_slug = project["board_slug"] if project else store.default_board_slug()
+    project = _refresh_project_agents(store, project, server_url) or project
     hook_name = _hook_name(payload)
     agent_type = _agent_type(payload)
     participant_id, raw_agent_id = _participant_id_for_hook(

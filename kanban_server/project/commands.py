@@ -295,6 +295,9 @@ PYTHONPATH={CODEX_KANBAN_REPO_ROOT} python3 -m kanban_server.project overview \\
 This identifies the matching board from registered project paths, lists
 all non-done non-archived cards plus the most recent done cards, and reports
 whether additional done or archived cards exist for possible follow-up search.
+It also refreshes board-scoped AI participants from current generic/default
+profiles and discoverable project-local agents so UI people fields stay
+current after agent defaults or project agents change.
 Split multi-intent human requests before implementation: independent features,
 fixes, affected apps/repos, user roles, UI flows, or deployment scopes should
 be separate sibling cards or child cards under a coordination parent, not one

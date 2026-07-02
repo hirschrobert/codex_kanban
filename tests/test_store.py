@@ -619,7 +619,7 @@ class KanbanStoreTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(
             ValueError,
-            "Known participants: demo-project-implementer",
+            "Known participants: .*demo-project-implementer",
         ):
             store.update_card(card["id"], {"assignee_id": "missing-agent"})
 

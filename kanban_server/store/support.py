@@ -4,6 +4,7 @@ import json
 import os
 import re
 import tomllib
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -45,6 +46,9 @@ PRIORITIES = {"low", "normal", "high", "urgent"}
 PARTICIPANT_KINDS = {"agent", "human", "system"}
 LOCAL_COMMENT_AUTHOR_NAME = "local developer"
 LEGACY_LOCAL_COMMENT_AUTHOR_NAMES = {"local human"}
+DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME = "AI Agent Manager"
+DEFAULT_AI_AGENT_MANAGER_ROLE = "Main AI agent coordinating Kanban cards through the CLI."
+DEFAULT_AI_AGENT_MANAGER_SUFFIX = "ai-agent-manager"
 PARTICIPANT_STATUSES = {
     "idle",
     "running",
@@ -88,6 +92,7 @@ GENERIC_AGENT_PROFILES = {
 }
 
 AGENT_PROFILE_FILE_SUFFIXES = {".toml", ".json", ".md", ".txt"}
+CODEX_KANBAN_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 CARD_TEXT_FIELDS = {
     "external_id",
@@ -170,7 +175,7 @@ def discover_project_agent_profiles(
         candidates.append(root_path)
     candidates.extend(paths or [])
 
-    profiles: list[str] = []
+    agent_dirs: list[Path] = []
     seen_dirs: set[Path] = set()
     for candidate in candidates:
         raw_path = candidate.get("path") if isinstance(candidate, dict) else candidate
@@ -178,6 +183,31 @@ def discover_project_agent_profiles(
             continue
         try:
             agent_dir = Path(str(raw_path)).expanduser().resolve() / ".codex" / "agents"
+        except (OSError, RuntimeError):
+            continue
+        if agent_dir in seen_dirs or not agent_dir.is_dir():
+            continue
+        seen_dirs.add(agent_dir)
+        agent_dirs.append(agent_dir)
+    return discover_agent_profiles_from_dirs(agent_dirs)
+
+
+def discover_default_agent_profiles() -> list[str]:
+    codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")).expanduser()
+    return discover_agent_profiles_from_dirs(
+        [
+            CODEX_KANBAN_REPO_ROOT / ".codex" / "agents",
+            codex_home / "agents",
+        ]
+    )
+
+
+def discover_agent_profiles_from_dirs(agent_dirs: Sequence[str | Path]) -> list[str]:
+    profiles: list[str] = []
+    seen_dirs: set[Path] = set()
+    for raw_dir in agent_dirs:
+        try:
+            agent_dir = Path(raw_dir).expanduser().resolve()
         except (OSError, RuntimeError):
             continue
         if agent_dir in seen_dirs or not agent_dir.is_dir():
@@ -402,17 +432,23 @@ __all__ = [
     "PARTICIPANT_KINDS",
     "LOCAL_COMMENT_AUTHOR_NAME",
     "LEGACY_LOCAL_COMMENT_AUTHOR_NAMES",
+    "DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME",
+    "DEFAULT_AI_AGENT_MANAGER_ROLE",
+    "DEFAULT_AI_AGENT_MANAGER_SUFFIX",
     "PARTICIPANT_STATUSES",
     "JSON_LIST_FIELDS",
     "PROJECT_JSON_FIELDS",
     "GENERIC_AGENT_PROFILES",
     "AGENT_PROFILE_FILE_SUFFIXES",
+    "CODEX_KANBAN_REPO_ROOT",
     "CARD_TEXT_FIELDS",
     "utc_now",
     "_utc_datetime",
     "slugify",
     "agent_profile_id",
     "merge_agent_profiles",
+    "discover_default_agent_profiles",
+    "discover_agent_profiles_from_dirs",
     "discover_project_agent_profiles",
     "_profile_from_agent_file",
     "_json_dumps",

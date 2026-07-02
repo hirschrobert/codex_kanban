@@ -59,6 +59,8 @@ class ProjectCliTest(unittest.TestCase):
             ]
         )
 
+        self.assertIn("refreshes board-scoped AI participants", output)
+        self.assertIn("current generic/default", output)
         self.assertIn("Split multi-intent human requests before implementation", output)
         self.assertIn("separate sibling cards or child cards", output)
         self.assertIn("bundled implementation card", output)

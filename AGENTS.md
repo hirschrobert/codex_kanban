@@ -9,6 +9,9 @@ human developers, the main AI agent, and optional AI subagents.
   release, registration, or multi-agent work. Skip Kanban for trivial command
   checks and keep exploratory discussion read-only until implementation is
   approved.
+- Startup overview and explicit `codex-kanban` reloads must refresh
+  board-scoped AI participants from the current generic/default profiles and
+  discoverable project-local profiles so UI people fields stay current.
 - Split multi-intent human requests before implementation starts. If one prompt
   contains independent features, fixes, affected apps/repos, user roles, UI
   flows, or deployment scopes, create separate sibling cards or a coordination

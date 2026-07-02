@@ -70,6 +70,10 @@ paths, and reports how many archived and done cards are hidden. Use
 when older archived context may matter. `--register-if-missing` only
 auto-registers a single repo whose `AGENTS.md` opts into `codex-kanban`;
 ecosystems still need explicit repeated `--path` and `--instruction` values.
+The same overview also refreshes board-scoped AI participants from current
+generic/default profiles and discoverable project-local `.codex/agents`, so the
+dashboard people, owner, assignee, and comment-writer fields stay current after
+agent defaults or project agents change.
 
 ## Manual Dialogs
 
@@ -550,6 +554,9 @@ checks, changed assumptions, and follow-up cards.
 Participating AI agents should:
 
 - check the selected board for human-added cards before starting work;
+- rerun the startup overview when a session starts or the human asks to reload
+  `codex-kanban`; this refreshes current generic/default and project-local AI
+  agents into the UI people fields before cards are assigned;
 - use board-scoped participant IDs such as
   `<board-slug>-project-implementer`; generic profile names are templates, not
   cross-project identities;

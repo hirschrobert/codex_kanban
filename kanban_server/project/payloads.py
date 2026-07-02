@@ -6,16 +6,15 @@ from pathlib import Path
 from typing import Any
 
 from ..store.support import (
+    DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME,
+    DEFAULT_AI_AGENT_MANAGER_ROLE,
+    DEFAULT_AI_AGENT_MANAGER_SUFFIX,
     GENERIC_AGENT_PROFILES,
     discover_project_agent_profiles,
     merge_agent_profiles,
     slugify,
 )
 from .git_ops import _current_git_branch
-
-DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME = "AI Agent Manager"
-DEFAULT_AI_AGENT_MANAGER_ROLE = "Main AI agent coordinating Kanban cards through the CLI."
-DEFAULT_AI_AGENT_MANAGER_SUFFIX = "ai-agent-manager"
 
 
 def _default_instruction_paths(root: Path) -> list[str]:

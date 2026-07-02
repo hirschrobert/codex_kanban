@@ -29,11 +29,14 @@ For command details and longer examples, see `docs/codex-kanban.md`.
    cwd matching; ecosystems match any registered app, repo, or worktree path.
    Prefer `${CODEX_KANBAN_URL:-http://127.0.0.1:8766}`; direct SQLite fallback
    is OK.
-3. Inspect a lean non-archived card overview before work. Human-added cards
+3. Refresh board-scoped AI agents from current generic defaults and
+   discoverable project-local profiles. The startup overview command below does
+   this and updates the dashboard people/assignee lists.
+4. Inspect a lean non-archived card overview before work. Human-added cards
    are authoritative unless the user redirects the task. Remember archived
    cards may exist and may need a separate archived search for older context.
-4. Select the relevant card or create one if none fits.
-5. Record start, block, handoff, finish, and delegated feedback through the
+5. Select the relevant card or create one if none fits.
+6. Record start, block, handoff, finish, and delegated feedback through the
    ingester, CLI, or HTTP API.
 
 ## Intake
@@ -82,7 +85,9 @@ PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.project overview \
 
 Use full `snapshot` only when you need events, participants, comments, or
 archived-inclusive board state. Use `--done-limit -1` only when completed-card
-history is needed; first overview should keep done-card history short.
+history is needed; first overview should keep done-card history short. If the
+human asks to reload the `codex-kanban` skill, rerun the overview command so
+current generic/default and project-local agents are synced into the UI.
 
 ```bash
 PYTHONPATH=/path/to/codex_kanban python3 -m kanban_server.project card-create \

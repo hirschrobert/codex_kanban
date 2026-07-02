@@ -170,6 +170,12 @@ class StoreMixinContract:
         target_branch: str | None,
     ) -> tuple[str, str, str]: ...
 
+    def _refresh_project_agents(
+        self,
+        conn: sqlite3.Connection,
+        project: dict[str, Any],
+    ) -> dict[str, Any]: ...
+
     def _resolve_card_id(
         self,
         conn: sqlite3.Connection,
@@ -261,5 +267,7 @@ class StoreMixinContract:
     def get_card(self, card_id: int) -> dict[str, Any] | None: ...
 
     def project_for_path(self, path: str | Path) -> dict[str, Any] | None: ...
+
+    def refresh_project_agents(self, board_slug: str) -> dict[str, Any] | None: ...
 
     def resolve_project_for_paths(self, paths: list[str | Path]) -> dict[str, Any]: ...

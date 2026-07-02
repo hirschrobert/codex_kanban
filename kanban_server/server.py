@@ -385,6 +385,8 @@ class KanbanHandler(BaseHTTPRequestHandler):
                             done_limit=done_limit,
                         )
                         result["registered_project"] = registered_project
+                if result.get("agent_profiles_refreshed") and result.get("board"):
+                    self._broadcast(result["board"]["slug"])
                 self._send_json(result)
                 return
             if parsed.path == "/api/workflows/due-cards":
@@ -746,6 +748,8 @@ class KanbanHandler(BaseHTTPRequestHandler):
         include_archived: bool = False,
         archived_only: bool = False,
     ) -> dict[str, Any]:
+        if board_slug:
+            self.kanban_server.store.refresh_project_agents(board_slug)
         snapshot = self.kanban_server.store.snapshot(
             board_slug,
             include_archived=include_archived,

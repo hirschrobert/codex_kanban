@@ -50,6 +50,10 @@ class OverviewStoreMixin(_StoreMixinContract):
                 (effective_board_slug,),
             )
             active_project = self._active_project_for_board(conn, effective_board_slug)
+            agent_refresh = None
+            if active_project:
+                agent_refresh = self._refresh_project_agents(conn, active_project)
+                active_project = agent_refresh["project"]
             projects = self._overview_projects(conn)
             cards, done_card_count, done_cards_hidden_count = self._overview_cards(
                 conn,
@@ -67,6 +71,15 @@ class OverviewStoreMixin(_StoreMixinContract):
                 "project_resolution": resolution_payload,
                 "active_project": active_project,
                 "projects": projects,
+                "agent_profiles_refreshed": bool(agent_refresh),
+                "agent_profiles": (
+                    agent_refresh["agent_profiles"]
+                    if agent_refresh
+                    else active_project.get("agent_profiles", []) if active_project else []
+                ),
+                "agent_participant_ids": (
+                    agent_refresh["participant_ids"] if agent_refresh else []
+                ),
                 "cards": cards,
                 "card_count": len(cards),
                 "done_limit": done_limit,
