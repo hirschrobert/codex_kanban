@@ -61,10 +61,11 @@ human developers, the main AI agent, and optional AI subagents.
   local ref from a development repository.
 - The full CI workflow runs on release branches, not on main pushes. Keep
   feature, fix, and release metadata commits on `release/<version>`, then
-  integrate them with an explicit no-fast-forward release merge commit whose
-  first parent is the previous `main` and whose second parent is the release
-  branch tip. Push that merge commit back to `release/<version>` and wait for
-  CI on that exact SHA before advancing `main`.
+  create an explicit no-fast-forward release merge commit before the first
+  public push for that release. The merge commit's first parent is the previous
+  `main` and its second parent is the release branch tip. Push that merge
+  commit to `release/<version>` once and wait for CI on that exact SHA before
+  advancing `main`.
 - Advance `main` only by fast-forwarding it to the exact release merge commit
   SHA that passed CI on `release/**`; do not squash, rebase, rewrite, or create
   an untested main-only commit.

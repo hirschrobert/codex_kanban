@@ -229,8 +229,9 @@ Public release rules that must remain explicit:
 - integrate a release with an explicit no-fast-forward merge commit whose first
   parent is the previous `main` and whose second parent is the release branch
   tip;
-- push that merge commit back to `release/<version>` and wait for CI on that
-  exact SHA before advancing `main`;
+- create that merge commit before the first public push for the release, then
+  push it to `release/<version>` once and wait for CI on that exact SHA before
+  advancing `main`;
 - advance `main` only by fast-forwarding it to the exact release merge commit
   SHA that passed release-branch CI; never squash, rebase, rewrite, or create
   an untested main-only commit.

@@ -464,16 +464,18 @@ commit, publish, migrate, sign, deploy, or ask for human approval.
 ## Release Integration
 
 For public releases, keep feature, fix, and release metadata commits on
-`release/<version>`. After release-branch CI passes on the release tip, create
-a no-fast-forward merge commit from the current public `main` and the release
-branch. Push that merge commit back to `release/<version>` first and wait for
-CI on that exact SHA, then fast-forward `main` to the same merge SHA and tag
-that merge commit.
+`release/<version>`. Create the no-fast-forward merge commit locally before the
+first public push for that release. The merge commit should use the current
+public `main` as first parent and the release branch tip as second parent.
+Push that merge commit to `release/<version>` once and wait for CI on that
+exact SHA, then fast-forward `main` to the same merge SHA and tag that merge
+commit.
 
 This keeps `main` easy to scan by release merge points while preserving the
-release branch as the visible group of included work. Do not squash, rebase,
-rewrite, or create a separate untested main-only commit for release
-integration.
+release branch as the visible group of included work. It also avoids a CI run
+on the pre-merge release tip followed by a second run on almost the same merge
+tree. Do not squash, rebase, rewrite, or create a separate untested main-only
+commit for release integration.
 
 If a card assignment fails because the assignee is unknown, choose an existing
 participant from the snapshot or register the participant first:
