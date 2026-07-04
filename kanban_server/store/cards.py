@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from .support import (
     CARD_TEXT_FIELDS,
+    DEFAULT_ACTIVITY_EVENT_LIMIT,
     DEFAULT_REPEAT_TIME,
     DEFAULT_REPEAT_TIMEZONE,
     JSON_LIST_FIELDS,
@@ -35,7 +36,7 @@ class CardStoreMixin(_StoreMixinContract):
     def snapshot(
         self,
         board_slug: str | None = None,
-        event_limit: int = 80,
+        event_limit: int = DEFAULT_ACTIVITY_EVENT_LIMIT,
         *,
         include_archived: bool = False,
         archived_only: bool = False,
@@ -117,18 +118,7 @@ class CardStoreMixin(_StoreMixinContract):
             self._attach_card_comments(conn, cards)
             self._attach_affected_project_paths(cards, active_project)
             cards = self._cards_with_coordination(cards, participants)
-            events_desc = [
-                self._event_from_row(row)
-                for row in conn.execute(
-                    """
-                    SELECT * FROM events
-                    WHERE board_slug = ?
-                    ORDER BY id DESC
-                    LIMIT ?
-                    """,
-                    (board_slug, event_limit),
-                )
-            ]
+            event_page = self._event_page(conn, board_slug, limit=event_limit)
             return {
                 "server_time": server_time,
                 "board": dict(board) if board else None,
@@ -152,7 +142,9 @@ class CardStoreMixin(_StoreMixinContract):
                 "lanes": lanes,
                 "cards": cards,
                 "participants": participants,
-                "events": list(reversed(events_desc)),
+                "events": event_page["events"],
+                "events_has_more": event_page["has_more"],
+                "events_next_before_id": event_page["next_before_id"],
             }
 
     def get_card(self, card_id: int) -> dict[str, Any] | None:

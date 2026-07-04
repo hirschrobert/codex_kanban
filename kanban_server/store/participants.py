@@ -4,6 +4,7 @@ import sqlite3
 from typing import TYPE_CHECKING, Any
 
 from .support import (
+    DEFAULT_ACTIVITY_EVENT_LIMIT,
     PARTICIPANT_KINDS,
     _json_dumps,
     _normalise_comment_author_name,
@@ -104,6 +105,69 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
         payload = dict(payload)
         payload["id"] = participant_id
         return self.upsert_participant(payload)
+
+    def list_events(
+        self,
+        board_slug: str | None = None,
+        *,
+        limit: int = DEFAULT_ACTIVITY_EVENT_LIMIT,
+        before_id: int | None = None,
+    ) -> dict[str, Any]:
+        page_size = max(1, min(int(limit or DEFAULT_ACTIVITY_EVENT_LIMIT), 100))
+        with self._lock, self._connect() as conn:
+            requested_board_slug = slugify(board_slug) if board_slug else None
+            resolved_board_slug = requested_board_slug or self._default_board_slug(conn)
+            if requested_board_slug and not self._one(
+                conn, "SELECT 1 FROM boards WHERE slug = ?", (requested_board_slug,)
+            ):
+                resolved_board_slug = self._default_board_slug(conn)
+            if self._board_is_removed_project(conn, resolved_board_slug):
+                resolved_board_slug = self._default_board_slug(conn)
+            self.ensure_board(resolved_board_slug, conn=conn)
+            page = self._event_page(
+                conn,
+                resolved_board_slug,
+                limit=page_size,
+                before_id=before_id,
+            )
+            page["board_slug"] = resolved_board_slug
+            return page
+
+    def _event_page(
+        self,
+        conn: Any,
+        board_slug: str,
+        *,
+        limit: int = DEFAULT_ACTIVITY_EVENT_LIMIT,
+        before_id: int | None = None,
+    ) -> dict[str, Any]:
+        page_size = max(1, min(int(limit or DEFAULT_ACTIVITY_EVENT_LIMIT), 100))
+        params: list[Any] = [board_slug]
+        before_clause = ""
+        if before_id is not None and before_id > 0:
+            before_clause = "AND id < ?"
+            params.append(before_id)
+        params.append(page_size + 1)
+        rows = list(
+            conn.execute(
+                f"""
+                SELECT * FROM events
+                WHERE board_slug = ?
+                  {before_clause}
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                tuple(params),
+            )
+        )
+        events_desc = rows[:page_size]
+        events = [self._event_from_row(row) for row in reversed(events_desc)]
+        return {
+            "board_slug": board_slug,
+            "events": events,
+            "has_more": len(rows) > page_size,
+            "next_before_id": events[0]["id"] if events and len(rows) > page_size else None,
+        }
 
     def create_event(self, payload: dict[str, Any]) -> dict[str, Any]:
         event_type = str(payload.get("event_type") or "event").strip()

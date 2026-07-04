@@ -809,6 +809,48 @@ class KanbanStoreProjectCoordinationTest(unittest.TestCase):
         self.assertEqual(event["metadata"]["scope"], "dashboard")
         self.assertTrue(any(item["participant_id"] == "demo-user" for item in snapshot["events"]))
 
+    def test_snapshot_and_event_pages_default_to_latest_ten(self) -> None:
+        store = self.make_store()
+        self.register_demo_project(store)
+        for index in range(25):
+            store.create_event(
+                {
+                    "board_slug": "demo",
+                    "event_type": f"test.{index:02d}",
+                    "message": str(index),
+                }
+            )
+
+        snapshot = store.snapshot("demo")
+        second_page = store.list_events(
+            "demo",
+            limit=10,
+            before_id=snapshot["events_next_before_id"],
+        )
+        third_page = store.list_events(
+            "demo",
+            limit=10,
+            before_id=second_page["next_before_id"],
+        )
+
+        self.assertEqual(
+            [event["event_type"] for event in snapshot["events"]],
+            [f"test.{index:02d}" for index in range(15, 25)],
+        )
+        self.assertTrue(snapshot["events_has_more"])
+        self.assertEqual(snapshot["events_next_before_id"], snapshot["events"][0]["id"])
+        self.assertEqual(
+            [event["event_type"] for event in second_page["events"]],
+            [f"test.{index:02d}" for index in range(5, 15)],
+        )
+        self.assertTrue(second_page["has_more"])
+        self.assertEqual(
+            [event["event_type"] for event in third_page["events"]],
+            [f"test.{index:02d}" for index in range(5)],
+        )
+        self.assertFalse(third_page["has_more"])
+        self.assertIsNone(third_page["next_before_id"])
+
     def test_delegated_agent_feedback_event_becomes_card_comment(self) -> None:
         store = self.make_store()
         self.register_demo_project(store)

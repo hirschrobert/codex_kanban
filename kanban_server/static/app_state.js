@@ -10,7 +10,10 @@ const state = {
   eventSource: null,
   showArchived: savedShowArchived,
   participantLimit: 10,
-  activityLimit: 10,
+  activityPageSize: 10,
+  activityHasMore: false,
+  activityLoading: false,
+  activityExtended: false,
   archiveSelections: {},
 };
 const priorities = new Set(["urgent", "high"]);

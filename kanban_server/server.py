@@ -328,6 +328,23 @@ class KanbanHandler(BaseHTTPRequestHandler):
                     )
                 )
                 return
+            if parsed.path == "/api/events":
+                query = parse_qs(parsed.query)
+                board = (
+                    query.get("board", [None])[0]
+                    or self.kanban_server.default_board_slug
+                    or self.kanban_server.store.default_board_slug()
+                )
+                limit = self._int_query(query, "limit", default=10)
+                before_id = self._int_query(query, "before_id")
+                self._send_json(
+                    self.kanban_server.store.list_events(
+                        board,
+                        limit=limit,
+                        before_id=before_id if before_id > 0 else None,
+                    )
+                )
+                return
             if parsed.path == "/api/projects":
                 snapshot = self.kanban_server.store.snapshot(self.kanban_server.default_board_slug)
                 self._send_json(

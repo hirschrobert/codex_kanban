@@ -444,6 +444,47 @@ class ServerDefaultsTest(unittest.TestCase):
                 any(event["event_type"] == "workflow.started" for event in snapshot["events"])
             )
 
+    def test_get_events_pages_activity_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = KanbanStore(Path(tmp) / "kanban.sqlite3")
+            self.register_demo_project(store)
+            httpd = self.start_server(store)
+            for index in range(12):
+                store.create_event(
+                    {
+                        "board_slug": "demo",
+                        "event_type": f"activity.{index:02d}",
+                        "message": str(index),
+                    }
+                )
+
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{httpd.server_address[1]}/api/events?board=demo&limit=10",
+                timeout=3,
+            ) as response:
+                first_page = json.loads(response.read().decode("utf-8"))
+            with urllib.request.urlopen(
+                (
+                    f"http://127.0.0.1:{httpd.server_address[1]}/api/events"
+                    f"?board=demo&limit=10&before_id={first_page['next_before_id']}"
+                ),
+                timeout=3,
+            ) as response:
+                second_page = json.loads(response.read().decode("utf-8"))
+
+            self.assertEqual(
+                [event["event_type"] for event in first_page["events"]],
+                [f"activity.{index:02d}" for index in range(2, 12)],
+            )
+            self.assertTrue(first_page["has_more"])
+            self.assertEqual(first_page["next_before_id"], first_page["events"][0]["id"])
+            self.assertEqual(
+                [event["event_type"] for event in second_page["events"]],
+                ["activity.00", "activity.01"],
+            )
+            self.assertFalse(second_page["has_more"])
+            self.assertIsNone(second_page["next_before_id"])
+
     def test_post_card_run_now_creates_manual_workflow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store = KanbanStore(Path(tmp) / "kanban.sqlite3")
