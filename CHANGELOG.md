@@ -2,8 +2,8 @@
 
 ## 0.1.11 - 2026-07-04
 
-This release improves Activity handling, event retention, and branch guidance
-for coordinated multi-card development.
+This release improves Activity handling, event retention, branch guidance,
+code standards, and concurrent local SQLite coordination.
 
 Public commits:
 
@@ -24,6 +24,12 @@ Public commits:
   `release/0.1.11`.
 - `bfd6c4f` merges and optimizes the `CK-0348` Activity card-link work with the
   paginated Activity implementation.
+- `e4dc550` adds explicit release-branch code standards for file size,
+  responsibility splits, naming, and behavior-preserving cleanup.
+- `248a8a5` enables concurrent SQLite store access with async-capable store
+  entrypoints, WAL/busy-timeout connection settings, and concurrency tests.
+- `8e365b8` merges the `CK-0354` async SQLite store work into
+  `release/0.1.11`.
 
 Release metadata note:
 
@@ -45,6 +51,14 @@ Changes:
 - Updated project and packaged skill guidance so related follow-up requests
   from the same local user can reuse an existing same-topic feature branch when
   that reduces redundant code and merge conflicts.
+- Added a release-branch `Code Standards` instruction covering file-size
+  limits, domain-responsibility splits, avoiding generic `mixin` names for
+  split-out code, and removing unnecessary code without accidental behavior
+  changes.
+- Improved local SQLite coordination for concurrent agents, CLI commands, and
+  server handlers by removing the process-local store serialization point,
+  adding async-capable store wrappers, and strengthening SQLite busy/WAL
+  connection settings.
 
 AI disclosure:
 
