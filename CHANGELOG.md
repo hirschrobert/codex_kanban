@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.1.11 - 2026-07-04
+
+This release improves Activity handling, event retention, and branch guidance
+for coordinated multi-card development.
+
+Public commits:
+
+- `473deec` prunes SQLite event rows older than the retention window during
+  graceful server shutdown.
+- `e02dc50` prints the number of pruned event rows during shutdown cleanup.
+- `071ba50` changes the Activity panel to load the latest 10 events first and
+  fetch older events in pages of 10 while scrolling inside the panel.
+- `1d805e5` fixes Activity panel scrolling and row wrapping so event text stays
+  readable in narrow layouts.
+- `b401d68` links Activity events to related cards, opens archived cards on
+  demand, and shows a picker when an event references multiple cards.
+- `8991af8` clarifies that same-topic local follow-up work may stay on the
+  existing card branch instead of forcing redundant sibling branches.
+- `aef48a5` merges the `CK-0346` event retention work into `release/0.1.11`.
+- `e1cffad` merges the `CK-0349` branch-policy update into `release/0.1.11`.
+- `e6819c4` merges the `CK-0347` Activity pagination work into
+  `release/0.1.11`.
+- `bfd6c4f` merges and optimizes the `CK-0348` Activity card-link work with the
+  paginated Activity implementation.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Kept only recent Activity events in the initial snapshot and added a paged
+  `/api/events` flow for loading older events without growing the side rail
+  unexpectedly.
+- Made Activity events clickable when they reference cards, including events
+  tied to archived cards and events that need a multi-card picker.
+- Centralized Activity event related-card enrichment so both initial snapshots
+  and older event pages expose the same clickable card metadata.
+- Added shutdown cleanup for local coordination events older than 48 hours and
+  a terminal summary of how many rows were pruned.
+- Updated project and packaged skill guidance so related follow-up requests
+  from the same local user can reuse an existing same-topic feature branch when
+  that reduces redundant code and merge conflicts.
+
+AI disclosure:
+
+This release was developed, reviewed, and prepared with help from AI agents
+using GPT-5, coordinated through the Codex Kanban workflow.
+
 ## 0.1.10 - 2026-07-04
 
 This release strengthens continuous development coordination by separating
