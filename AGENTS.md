@@ -16,17 +16,36 @@ human developers, the main AI agent, and optional AI subagents.
   contains independent features, fixes, affected apps/repos, user roles, UI
   flows, or deployment scopes, create separate sibling cards or a coordination
   parent with child cards instead of one bundled implementation card.
-- Treat Codex Kanban as a standing project instruction to consider specialized
-  subagents for concrete work when they can improve software quality,
-  usability, safety, maintainability, or data integrity. Do not spawn every
-  available profile by default; choose the smallest relevant set from the
-  board-scoped participants and explain the delegation reason.
+- Treat Codex Kanban as a standing project instruction for the first/main AI
+  agent to actively consider specialized subagents at session start and before
+  each material implementation, review, release, documentation, or audit step.
+  Use them more consequently when they can improve software quality, usability,
+  safety, maintainability, or data integrity. Do not spawn every available
+  profile by default; choose the smallest relevant set from the board-scoped
+  participants and explain the delegation reason or why delegation was skipped.
 - For concrete multi-agent work, create one parent coordination card plus one
   linked child for the main implementer and each delegated subagent doing
   material work. Assign children to board-scoped participants and record
   start/finish/handoff on those child cards. If the active Codex environment
   still disallows spawning, record the cards and surface the blocker instead of
   silently folding delegated work into the parent agent.
+- Treat different user requests, implementation scopes, and agents as separate
+  contributors. Feature/fix implementation cards must use their own
+  card-specific `feature/<CARD-ID>-...` or `fix/<CARD-ID>-...` branch, based on
+  the current release branch and ahead of `main`, with one or more commits before
+  handoff. Do not combine unrelated cards on one branch or leave unstaged
+  implementation changes as handoff state. Coordination, review, release, and
+  read-only audit cards do not need their own write branch, but they must record
+  which implementation branch or release branch they inspect.
+- Merge a feature/fix branch into the upcoming release branch only after human
+  final review/approval. After any branch lands on the release branch, all other
+  active feature/fix branches must rebase or otherwise refresh from that release
+  branch and record updated SHAs/checks before continuing.
+- When a subagent or other contributor finishes material work, write its result
+  as a concise comment on the parent coordination card. Child cards hold
+  execution status, branch/check details, and local handoff facts; parent-card
+  comments hold the durable findings, decisions, blockers, and next steps for
+  continuing the topic.
 - For ecosystem release/deploy work, record affected apps, repos, worktrees,
   and deployment dispositions before marking production deployment complete.
 - Keep this app abstract. Do not hardcode project-specific domains, agent names,
@@ -74,12 +93,13 @@ human developers, the main AI agent, and optional AI subagents.
   `main` release-merge fast-forward ref, or release tags. Do not mirror every
   local ref from a development repository.
 - The full CI workflow runs on release branches, not on main pushes. Keep
-  feature, fix, and release metadata commits on `release/<version>`, then
-  create an explicit no-fast-forward release merge commit before the first
+  feature and fix work on card-specific branches until human-approved merge to
+  `release/<version>`. Keep release metadata commits on `release/<version>`,
+  then create an explicit no-fast-forward release merge commit before the first
   public push for that release. The merge commit's first parent is the previous
-  `main` and its second parent is the release branch tip. Push that merge
-  commit to `release/<version>` once and wait for CI on that exact SHA before
-  advancing `main`.
+  `main` and its second parent is the release branch tip. Push that merge commit
+  to `release/<version>` once and wait for CI on that exact SHA before advancing
+  `main`.
 - Advance `main` only by fast-forwarding it to the exact release merge commit
   SHA that passed CI on `release/**`; do not squash, rebase, rewrite, or create
   an untested main-only commit.

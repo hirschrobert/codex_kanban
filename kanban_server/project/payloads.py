@@ -100,7 +100,8 @@ def _default_ai_agent_manager_id(board_slug: str) -> str:
 def _default_ai_agent_manager_payload_for_args(
     args: argparse.Namespace,
 ) -> dict[str, str] | None:
-    if args.actor_id or not args.board:
+    explicit_actor = args.actor_id or getattr(args, "participant_id", "")
+    if explicit_actor or not args.board:
         return None
     board_slug = slugify(args.board)
     return {
@@ -187,6 +188,20 @@ def _card_update_payload(args: argparse.Namespace) -> dict[str, Any]:
     if getattr(args, "clear_blocker", False) or args.blocker is not None:
         update["blocker_reason"] = blocker_reason or ""
     return update
+
+
+def _card_comment_payload(args: argparse.Namespace) -> dict[str, Any]:
+    participant_id = args.participant_id or args.actor_id
+    if not participant_id and args.board:
+        participant_id = _default_ai_agent_manager_id(args.board)
+    payload = {
+        "board_slug": args.board,
+        "participant_id": participant_id,
+        "author_name": args.author_name,
+        "author_kind": args.author_kind,
+        "body": args.body,
+    }
+    return {key: value for key, value in payload.items() if value not in (None, "")}
 
 
 def _participant_payload(args: argparse.Namespace) -> dict[str, Any]:

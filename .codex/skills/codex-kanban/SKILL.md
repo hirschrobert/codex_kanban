@@ -35,8 +35,13 @@ For command details and longer examples, see `docs/codex-kanban.md`.
 4. Inspect a lean non-archived card overview before work. Human-added cards
    are authoritative unless the user redirects the task. Remember archived
    cards may exist and may need a separate archived search for older context.
-5. Select the relevant card or create one if none fits.
-6. Record start, block, handoff, finish, and delegated feedback through the
+5. Select the relevant card or create one if none fits. For implementation
+   work, confirm the card has a target release branch and a card-specific
+   feature/fix branch before editing files.
+6. Deliberately decide which board-scoped subagents should contribute before
+   starting material work. Use the smallest relevant set and record the reason
+   when delegation is useful or skipped.
+7. Record start, block, handoff, finish, and delegated feedback through the
    ingester, CLI, or HTTP API.
 
 ## Intake
@@ -66,9 +71,10 @@ For non-trivial card descriptions, use one clean rationale block:
 - `If this is not fixed:`;
 - `Acceptance criteria:`.
 
-Do not duplicate those headings. If later information is feedback or readiness
-context, add a card comment. If it is separate work, create a child card or a
-new sibling card before assigning implementation.
+Do not duplicate those headings. If later information is feedback, findings,
+decisions, blockers, readiness context, or a finished contributor summary, add
+a card comment. If it is separate work, create a child card or a new sibling
+card before assigning implementation.
 
 ## Useful CLI Shapes
 
@@ -128,6 +134,19 @@ PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project card-move <numeric-ca
 Use `--clear-blocker` to remove a resolved blocker. If an assignee is missing,
 register it first with `participant-upsert`; do not invent participant IDs.
 
+```bash
+PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project card-comment <numeric-card-id> \
+  --server-url "${CODEX_KANBAN_URL:-http://127.0.0.1:8766}" \
+  --board <board> \
+  --participant-id <board-agent-id> \
+  --body "<durable note, finding, blocker, or contributor result>"
+```
+
+Use `card-comment` for durable context that future work should read but that is
+not a new task by itself. For delegated work, comment on the parent coordination
+card with the subagent's result, findings, decisions, blockers, and next steps.
+Also update the child card status/checks/handoff fields for execution state.
+
 Agent event ingestion:
 
 ```bash
@@ -170,13 +189,16 @@ bypassing Kanban.
 ## Multi-Agent Work
 
 Codex Kanban is a standing project instruction to consider specialized
-subagents for concrete work when delegation can improve software quality,
-usability, safety, maintainability, or data integrity. Choose from all available
-board-scoped profiles, including project-local profiles, but do not spawn every
-profile by default; select the smallest relevant set for independent
-implementation, review, release-readiness, documentation, audit, domain,
-contract, architecture, or test-strategy scopes. The main agent stays
-responsible for routing, integration, card hygiene, and final user summary.
+subagents at session start and before each material implementation, review,
+release-readiness, documentation, audit, domain, contract, architecture, or
+test-strategy step. Use them more consequently when delegation can improve
+software quality, usability, safety, maintainability, or data integrity. Choose
+from all available board-scoped profiles, including project-local profiles, but
+do not spawn every profile by default; select the smallest relevant set for
+independent scopes and say why they are being used. If the main agent decides
+not to delegate material work, record or summarize the reason. The main agent
+stays responsible for routing, integration, card hygiene, and final user
+summary.
 
 Some Codex environments may still disallow spawning from standing repo or skill
 instructions alone. If delegation is useful but the tool is unavailable or
@@ -193,10 +215,35 @@ Before delegating:
   parallel;
 - record target repo, target branch, starting SHA, worktree path, checks, and
   acceptance criteria.
+- when a delegated contributor finishes, add a concise comment to the parent
+  coordination card that summarizes the result, findings, decisions, blockers,
+  and next steps; keep child-card comments/status for child-local execution
+  details.
+
+Treat different user requests, write scopes, and agents as separate
+contributors. Do not bundle unrelated feature/fix work into one implementation
+card because it arrived in the same prompt or because one agent is available.
+
+## Branch Discipline
+
+Feature and fix implementation cards must have exactly one card-specific branch,
+optionally checked out in a worktree, usually `feature/<CARD-ID>-short-title` or
+`fix/<CARD-ID>-short-title`, based on the upcoming unreleased release branch and
+therefore ahead of `main`. Record it in `feature_branch` before editing files.
+The branch should contain one or more focused commits before handoff; loose
+unstaged changes are not a valid handoff state. Coordination, review, release,
+and read-only audit cards do not need their own write branch, but they must
+record which implementation branch or release branch they inspect.
+
+Merge a feature/fix branch into the release branch only after human final
+review/approval. After any approved card lands on the release branch, every
+other active feature/fix branch for that release must rebase or otherwise
+refresh from the release branch and record the updated base/handoff SHA and
+checks before continuing.
 
 Avoid overlapping implementation cards. Treat these as conflict signals:
 
-- same target repo and target branch;
+- same target repo/target branch without distinct feature branches;
 - same feature branch;
 - same worktree path;
 - same declared files;
@@ -238,6 +285,8 @@ Cards should accumulate only the fields needed for handoff:
 - files changed, checks run, failures, assumptions, blockers;
 - comments for human/agent feedback and follow-up child cards for separate
   work.
+- parent-card comments for delegated contributor results that should remain
+  with the topic context.
 
 A parent depends on its children and cannot advance into active/review/done
 until child dependencies are done.
@@ -261,7 +310,9 @@ Public release rules that must remain explicit:
 - push only explicit release branches, the approved `main` release-merge
   fast-forward ref, or release tags; never `--mirror` or `--all` from a
   development repo;
-- keep feature, fix, and release metadata commits on `release/<version>`;
+- keep feature/fix work on card-specific branches until human-approved merge to
+  `release/<version>`, and keep release metadata commits on
+  `release/<version>`;
 - integrate a release with an explicit no-fast-forward merge commit whose first
   parent is the previous `main` and whose second parent is the release branch
   tip;

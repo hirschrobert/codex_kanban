@@ -26,6 +26,7 @@ def _due_card_prompt(card: dict[str, Any], context: dict[str, Any] | None = None
     )
     target_repo = context.get("target_repo") or card.get("target_repo") or ""
     target_branch = context.get("target_branch") or card.get("target_branch") or ""
+    feature_branch = card.get("feature_branch") or ""
     return f"""Execute this Codex Kanban ready workflow card.
 
 Use the codex-kanban skill if it is available. Respect the current repo's
@@ -33,11 +34,14 @@ AGENTS.md and any project-specific approval gates. Do not commit, merge,
 publish, deploy, migrate, or perform destructive work unless the project
 instructions and human approval boundaries allow it.
 
-Work only on the target release branch `{target_branch}`. Never work on
-`main` or `master` for this workflow. If an expected release branch is missing
-inside a registered project repo, create or use that release branch before
-changing files. If the branch scope is unclear or unsafe, block the card and
-record why.
+Use the target release branch `{target_branch}` as the integration base. Never
+work on `main` or `master` for this workflow. For feature/fix implementation
+work, create or switch to the card-specific feature/fix branch recorded on the
+card before editing files; if none is recorded, choose one based on the card ID
+and record it on the card first. Commit implementation changes on that branch
+before handoff. Work directly on the target release branch only for release
+metadata or integration work allowed by the project instructions. If the branch
+scope is unclear or unsafe, block the card and record why.
 
 Board: {card.get('board_slug')}
 Card: {card.get('external_id') or card.get('id')}
@@ -47,6 +51,7 @@ Workflow key: {card.get('workflow_key') or ''}
 Scheduled for: {card.get('workflow_scheduled_for') or ''}
 Target repo: {target_repo}
 Target branch: {target_branch}
+Feature branch: {feature_branch}
 
 Registered project repos:
 {project_repos}

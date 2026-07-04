@@ -12,6 +12,7 @@ from .api import _patch_json, _post_json, _print_json, _request_json
 from .due import due_run as due_run
 from .payloads import (
     _agent_profiles,
+    _card_comment_payload,
     _card_payload,
     _card_update_payload,
     _default_ai_agent_manager_payload_for_args,
@@ -202,6 +203,35 @@ def card_move(args: argparse.Namespace) -> int:
     return 0
 
 
+def card_comment(args: argparse.Namespace) -> int:
+    payload = _card_comment_payload(args)
+    default_actor = _default_ai_agent_manager_payload_for_args(args)
+    if args.server_url:
+        if default_actor:
+            _post_json(args.server_url, "/api/participants", default_actor)
+        result = _post_json(args.server_url, f"/api/cards/{args.card_id}/comments", payload)
+        if result is not None:
+            _print_json(result)
+            return 0
+
+    store = KanbanStore(args.db)
+    if default_actor:
+        store.upsert_participant(default_actor)
+    comment = store.add_card_comment(args.card_id, payload)
+    store.create_event(
+        {
+            "board_slug": comment["board_slug"],
+            "event_type": "card.commented",
+            "card_id": comment["card_id"],
+            "participant_id": comment.get("participant_id"),
+            "message": comment["body"][:120],
+            "metadata": {"comment_id": comment["id"]},
+        }
+    )
+    _print_json(comment)
+    return 0
+
+
 def participant_upsert(args: argparse.Namespace) -> int:
     payload = _participant_payload(args)
     if args.server_url:
@@ -289,10 +319,16 @@ PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project register \\
 After registration, use board `{slug}` as the shared orchestration surface.
 Use the `codex-kanban` skill to respect human-added cards, work only on the
 assigned card/scope, and treat Codex Kanban as a standing project instruction
-to consider specialized subagents for concrete work when they can improve
+to actively consider specialized subagents at session start and before material
+implementation, review, release-readiness, documentation, audit, domain,
+contract, architecture, or test-strategy work. Use them when they can improve
 software quality, usability, safety, maintainability, or data integrity. Choose
 the smallest relevant set from all available board-scoped profiles, including
-project-local profiles: {profiles}. Do not spawn every profile by default.
+project-local profiles: {profiles}. Do not spawn every profile by default, and
+explain why delegation was used or skipped.
+When delegated work produces findings, decisions, blockers, or completion
+results, add a concise card comment to the parent coordination card so the
+topic context stays with the parent card, not only with a child card or chat.
 
 For first overview, run:
 
@@ -313,6 +349,11 @@ Split multi-intent human requests before implementation: independent features,
 fixes, affected apps/repos, user roles, UI flows, or deployment scopes should
 be separate sibling cards or child cards under a coordination parent, not one
 bundled implementation card.
+Treat different user requests, implementation scopes, and agents as separate
+contributors. Each feature/fix implementation card needs its own card-specific
+branch with commits before handoff. Merge it to the release branch only after
+human final review, then rebase or refresh remaining active feature/fix
+branches from that release branch.
 If a Codex environment still disallows spawning from standing project
 instructions alone, record the intended delegation cards and surface the blocker
 instead of silently doing delegated work in the parent context.

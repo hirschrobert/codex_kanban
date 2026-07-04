@@ -136,7 +136,13 @@ CLI, and HTTP API.
 When a card moves into active implementation, set `Target Branch` to the
 upcoming release branch that has not been released yet. If the project has no
 such release branch, create one. Workflow automation must not target `main` or
-`master`. By convention, feature branches or worktrees can live under:
+`master`. Each feature or fix implementation card should also record one
+card-specific `Feature Branch`, usually `feature/<CARD-ID>-short-title` or
+`fix/<CARD-ID>-short-title`, created from the target release branch and ahead of
+`main`. Do not share one feature branch across unrelated cards. Coordination,
+review, release, and read-only audit cards can omit their own write branch, but
+they should record which implementation branch or release branch they inspect.
+By convention, feature branches or worktrees can live under:
 
 ```text
 $HOME/codex-worktrees
@@ -152,12 +158,21 @@ server creates or reuses one ready workflow card and advances the template to
 the next future run. Use the card's `Run Now` button when a human intentionally
 wants an immediate workflow card.
 
-Card notes capture human or agent context that future work should consider.
-Notes are scoped to the card's board and appear in the card dialog with writer
-name, writer kind, date, and time. Agent `finished`, `feedback`, and `handoff`
-events, plus hook-style subagent `stopped`, `feedback`, and `handoff` events,
-are mirrored into notes when they include a card and message so card owners do
-not need to scan the event stream for delegated feedback.
+Card notes capture human or agent context that future work should consider but
+that is not a separate task. Use them for findings, decisions, blockers,
+readiness context, and contributor results. Notes are scoped to the card's board
+and appear in the card dialog with writer name, writer kind, date, and time.
+Agent `finished`, `feedback`, and `handoff` events, plus hook-style subagent
+`stopped`, `feedback`, and `handoff` events, are mirrored into notes when they
+include a card and message so card owners do not need to scan the event stream
+for delegated feedback.
+
+For parent/child coordination, child cards hold execution state: assignee,
+branch/worktree, files changed, checks, blockers, and handoff SHA. The parent
+coordination card should hold the durable topic context. When a subagent or
+other contributor finishes material work, add a concise note to the parent card
+with its result, findings, decisions, blockers, and next steps. This keeps the
+parent card useful as the place where future agents resume the topic.
 
 Archived cards are hidden from the normal board. Use the top-bar `Archived`
 toggle to switch to archived cards only; non-archived cards are hidden in that
@@ -311,10 +326,18 @@ Put this durable instruction in a new project's `AGENTS.md`:
 - Use the `codex-kanban` skill for concrete feature, fix, docs, test, review,
   release, registration, or multi-agent work in this repository.
 - Treat Codex Kanban as a standing instruction to consider specialized
-  subagents when they can improve software quality, usability, safety,
-  maintainability, or data integrity. Choose relevant specialists from all
-  available board-scoped profiles, including project-local profiles, instead of
-  spawning every profile by default.
+  subagents at session start and before material implementation, review,
+  release-readiness, documentation, audit, domain, contract, architecture, or
+  test-strategy work. Use them when they can improve software quality,
+  usability, safety, maintainability, or data integrity. Choose relevant
+  specialists from all available board-scoped profiles, including project-local
+  profiles, instead of spawning every profile by default, and explain why
+  delegation was used or skipped.
+- Treat different user requests, implementation scopes, and agents as separate
+  contributors. Each feature/fix implementation card needs its own
+  card-specific branch with commits before handoff. Merge it to the release
+  branch only after human final review, then rebase or refresh remaining active
+  feature/fix branches from that release branch.
 - Do not create Kanban cards or workflow updates for trivial local operations,
   quick command checks, or discussion that does not change project work.
 - For exploratory feature discussion, Kanban is optional and should stay light:
@@ -410,6 +433,28 @@ Use `--clear-blocker` when a resolved blocker should be removed while moving
 or handing off a card. Passing `--blocker ""` also clears the blocker text;
 omitting `--blocker` leaves existing blocker text unchanged.
 
+For feature/fix work, the `--feature-branch` value should be unique to the
+implementation card and should point to the branch that contains the card's
+commits. Do not hand off unstaged implementation files. After a human-approved
+merge updates the release branch, refresh every other active feature/fix branch
+from that release branch before more edits and record the new SHA/checks.
+
+Add a durable note to a card:
+
+```bash
+PYTHONPATH="$KANBAN_REPO" \
+python3 -m kanban_server.project card-comment 1 \
+  --server-url http://127.0.0.1:8766 \
+  --board my-project \
+  --participant-id my-project-project-reviewer \
+  --body "Reviewer result: no blocking findings; run contract tests before merge."
+```
+
+Use `card-comment` when the information should stay with the card but should
+not become a separate task. If a delegated agent finishes work on a child card,
+write the result summary on the parent coordination card and keep the child
+card's move/check/handoff fields focused on execution details.
+
 Link dependency cards from the CLI:
 
 ```bash
@@ -496,13 +541,16 @@ commit, publish, migrate, sign, deploy, or ask for human approval.
 
 ## Release Integration
 
-For public releases, keep feature, fix, and release metadata commits on
-`release/<version>`. Create the no-fast-forward merge commit locally before the
-first public push for that release. The merge commit should use the current
-public `main` as first parent and the release branch tip as second parent.
-Push that merge commit to `release/<version>` once and wait for CI on that
-exact SHA, then fast-forward `main` to the same merge SHA and tag that merge
-commit.
+For public releases, feature and fix cards first live on their own
+card-specific branches. After human final review, merge approved feature/fix
+branches into `release/<version>` and rebase or otherwise refresh the remaining
+active feature/fix branches from that updated release branch. Keep release
+metadata commits directly on `release/<version>`. Create the no-fast-forward
+merge commit locally before the first public push for that release. The merge
+commit should use the current public `main` as first parent and the release
+branch tip as second parent. Push that merge commit to `release/<version>` once
+and wait for CI on that exact SHA, then fast-forward `main` to the same merge
+SHA and tag that merge commit.
 
 This keeps `main` easy to scan by release merge points while preserving the
 release branch as the visible group of included work. It also avoids a CI run
@@ -586,9 +634,12 @@ Participating AI agents should:
   to the same agent; the main/project agent decides whether to coordinate more
   than one card, and should say so visibly;
 - avoid parallel implementation work with overlapping write scope. Overlap
-  means the same target repo/branch, same feature branch, same worktree path, or
-  same declared files. If overlap is likely, block or wait one card until the
-  other card records a handoff SHA;
+  means the same target repo/branch without distinct feature branches, same
+  feature branch, same worktree path, or same declared files. If overlap is
+  likely, block or wait one card until the other card records a handoff SHA;
+- give each feature/fix implementation card its own card-specific branch with
+  one or more commits before handoff. Do not combine unrelated cards on one
+  branch and do not treat loose unstaged files as handoff state;
 - refresh feature branches/worktrees from the current target branch before
   continuing unfinished work after another card lands. Integrity of the
   integrated codebase takes priority over preserving local progress;
@@ -598,10 +649,13 @@ Participating AI agents should:
   one feature plus one fix, different affected apps, different user roles, or
   independent deployment scopes should not share one implementation card;
 - treat Codex Kanban as a standing instruction to consider specialized
-  subagents for concrete work when they can improve software quality,
+  subagents at session start and before material implementation, review,
+  release-readiness, documentation, audit, domain, contract, architecture, or
+  test-strategy work. Use them when they can improve software quality,
   usability, safety, maintainability, or data integrity. Choose the smallest
   useful set from all available board-scoped profiles, including project-local
-  profiles, instead of spawning every profile by default;
+  profiles, instead of spawning every profile by default, and explain why
+  delegation was used or skipped;
 - start review automatically after implementation cards complete when a
   delegation mechanism is available. The implementation agent should not leave a
   reviewer card merely `ready` unless no reviewer can be started;
@@ -613,6 +667,9 @@ Participating AI agents should:
   A reviewer recommendation to merge is not itself merge approval;
 - treat dependency links as release guards: a parent depends on its child cards,
   and the parent may advance only after its children are done;
+- write durable findings, decisions, blockers, and contributor results as card
+  comments. When a delegated contributor finishes, summarize its result on the
+  parent coordination card so the parent keeps the topic context;
 - move or report the card when they start, block, hand off, or finish;
 - include card ID, branch, before/after target SHAs, changed files, checks,
   failures, changed assumptions, and follow-up cards in handoffs;

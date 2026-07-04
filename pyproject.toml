@@ -1,6 +1,6 @@
 [project]
 name = "codex-kanban"
-version = "0.1.9"
+version = "0.1.10"
 description = "Codex-native realtime Kanban dashboard for human and AI coordination."
 requires-python = ">=3.11"
 license = "AGPL-3.0-only"
