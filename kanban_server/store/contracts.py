@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sqlite3
-import threading
 from contextlib import AbstractContextManager
 from datetime import datetime
 from pathlib import Path
@@ -17,7 +16,7 @@ class StoreMixinContract:
 
     db_path: Path
     preferred_board_slug: str | None
-    _lock: threading.RLock
+    _lock: Any
 
     def _active_project_for_board(
         self,
