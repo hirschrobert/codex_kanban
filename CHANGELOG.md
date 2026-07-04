@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.1.10 - 2026-07-04
+
+This release strengthens continuous development coordination by separating
+independent contributors into auditable branches and making delegated findings
+durable on parent cards.
+
+Public commits:
+
+- `116c4ff` tightens branch, contributor, rebase, and human-review guidance for
+  feature/fix cards, and updates conflict detection so shared release targets
+  require distinct feature branches.
+- `9dd609b` merges the `CK-0334` branch workflow card into `release/0.1.10`.
+- `cac7470` adds a supported `card-comment` project CLI command, parent-card
+  comment guidance for delegated results, hook context for subagents, and
+  focused CLI/comment tests.
+- `558202e` merges the refreshed `CK-0338` card-comment workflow into
+  `release/0.1.10`.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Documented that separate user requests, implementation scopes, and AI agents
+  should be treated as separate contributors with card-specific feature/fix
+  branches, commits, human review before release-branch merge, and refreshes
+  from the updated release branch.
+- Added `card-comment` to the project CLI so agents have a supported way to add
+  durable notes to cards without relying on indirect event ingestion.
+- Clarified that subagent and contributor completion results belong as concise
+  comments on the parent coordination card, while child cards keep local
+  execution state such as checks, branches, and handoff SHAs.
+- Updated project guidance, the packaged Kanban skill, generated project
+  prompt text, subagent hook context, public release guidance, and regression
+  tests for the new coordination workflow.
+
+AI disclosure:
+
+This release was developed, reviewed, and prepared with help from AI agents
+using GPT-5 and GPT-5.5, coordinated through the Codex Kanban workflow.
+
 ## 0.1.9 - 2026-07-02
 
 This release makes Kanban startup and delegation guidance harder to misapply in
