@@ -36,8 +36,11 @@ For command details and longer examples, see `docs/codex-kanban.md`.
    are authoritative unless the user redirects the task. Remember archived
    cards may exist and may need a separate archived search for older context.
 5. Select the relevant card or create one if none fits. For implementation
-   work, confirm the card has a target release branch and a card-specific
-   feature/fix branch before editing files.
+   work, confirm the card has a target release branch and an appropriate
+   feature/fix branch before editing files. Prefer reusing an unmerged branch
+   when the new local request is a same-object/same-topic follow-up on that
+   branch; create a new branch when the work is unrelated or independently
+   reviewable.
 6. Deliberately decide which board-scoped subagents should contribute before
    starting material work. Use the smallest relevant set and record the reason
    when delegation is useful or skipped.
@@ -221,19 +224,32 @@ Before delegating:
   details.
 
 Treat different user requests, write scopes, and agents as separate
-contributors. Do not bundle unrelated feature/fix work into one implementation
-card because it arrived in the same prompt or because one agent is available.
+contributors in the card history. Do not bundle unrelated feature/fix work into
+one implementation card because it arrived in the same prompt or because one
+agent is available. A same-user local follow-up that continues the same object,
+UI surface, domain concept, or cohesive topic may reuse the existing unmerged
+topic branch while still creating or updating a distinct related card.
 
 ## Branch Discipline
 
-Feature and fix implementation cards must have exactly one card-specific branch,
-optionally checked out in a worktree, usually `feature/<CARD-ID>-short-title` or
-`fix/<CARD-ID>-short-title`, based on the upcoming unreleased release branch and
-therefore ahead of `main`. Record it in `feature_branch` before editing files.
-The branch should contain one or more focused commits before handoff; loose
-unstaged changes are not a valid handoff state. Coordination, review, release,
-and read-only audit cards do not need their own write branch, but they must
-record which implementation branch or release branch they inspect.
+Feature and fix implementation work must live on an explicit branch based on the
+upcoming unreleased release branch and therefore ahead of `main`. Usually create
+a card-named branch such as `feature/<CARD-ID>-short-title` or
+`fix/<CARD-ID>-short-title`. Reuse an existing unmerged feature/fix branch
+instead when all of these are true: the human's new local request is a follow-up
+to the same object, UI surface, domain concept, or cohesive topic; it targets
+the same release branch; it comes from the same immediate human/user context; and
+reviewing it together would reduce duplicate edits or merge conflicts without
+hiding unrelated behavior. In that case, create or update a related child/sibling
+card, record the shared branch in `feature_branch`, add one or more focused
+commits for the new card, and comment on the original/topic card when the
+follow-up changes scope or review expectations. Create a new branch when the
+request is unrelated, independently deployable/reviewable, from another release
+or user context, owned by another writer, or broad enough to make the existing
+topic branch unclear. Loose unstaged changes are not a valid handoff state.
+Coordination, review, release, and read-only audit cards do not need their own
+write branch, but they must record which implementation branch or release branch
+they inspect.
 
 Merge a feature/fix branch into the release branch only after human final
 review/approval. After any approved card lands on the release branch, every
@@ -241,7 +257,8 @@ other active feature/fix branch for that release must rebase or otherwise
 refresh from the release branch and record the updated base/handoff SHA and
 checks before continuing.
 
-Avoid overlapping implementation cards. Treat these as conflict signals:
+Avoid overlapping implementation cards. Treat these as conflict signals unless
+the cards explicitly document an intentional same-user, same-topic branch share:
 
 - same target repo/target branch without distinct feature branches;
 - same feature branch;
@@ -310,8 +327,8 @@ Public release rules that must remain explicit:
 - push only explicit release branches, the approved `main` release-merge
   fast-forward ref, or release tags; never `--mirror` or `--all` from a
   development repo;
-- keep feature/fix work on card-specific branches until human-approved merge to
-  `release/<version>`, and keep release metadata commits on
+- keep feature/fix work on explicit topic/card branches until human-approved
+  merge to `release/<version>`, and keep release metadata commits on
   `release/<version>`;
 - integrate a release with an explicit no-fast-forward merge commit whose first
   parent is the previous `main` and whose second parent is the release branch

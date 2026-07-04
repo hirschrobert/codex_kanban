@@ -105,6 +105,90 @@ class ServerDefaultsTest(unittest.TestCase):
 
         self.assertEqual(stderr.getvalue(), "")
 
+    def test_run_server_prunes_old_events_after_keyboard_interrupt(self) -> None:
+        class DummyThread:
+            def __init__(self, *args: object, **kwargs: object) -> None:
+                del args, kwargs
+                self.joined_timeout: float | None = None
+
+            def start(self) -> None:
+                pass
+
+            def join(self, timeout: float | None = None) -> None:
+                self.joined_timeout = timeout
+
+        fake_servers: list[Any] = []
+
+        class FakeHTTPServer:
+            def __init__(
+                self,
+                server_address: tuple[str, int],
+                handler: type[server.KanbanHandler],
+                *,
+                store: KanbanStore,
+                static_dir: Path,
+                default_board_slug: str | None,
+            ) -> None:
+                del server_address, handler, static_dir, default_board_slug
+                self.store = store
+                self.scheduler_stop = threading.Event()
+                self.closed = False
+                fake_servers.append(self)
+
+            def serve_forever(self) -> None:
+                raise KeyboardInterrupt
+
+            def server_close(self) -> None:
+                self.closed = True
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "kanban.sqlite3"
+            store = KanbanStore(db_path)
+            self.register_demo_project(store)
+            old = store.create_event(
+                {"board_slug": "demo", "event_type": "test.old", "message": "old"}
+            )
+            recent = store.create_event(
+                {"board_slug": "demo", "event_type": "test.recent", "message": "recent"}
+            )
+            with store._connect() as conn:
+                conn.execute(
+                    "UPDATE events SET created_at = ? WHERE id = ?",
+                    ("2000-01-01T00:00:00Z", old["id"]),
+                )
+                conn.execute(
+                    "UPDATE events SET created_at = ? WHERE id = ?",
+                    ("2999-01-01T00:00:00Z", recent["id"]),
+                )
+
+            stdout = io.StringIO()
+            with mock.patch.object(server, "KanbanHTTPServer", FakeHTTPServer):
+                with mock.patch.object(server.threading, "Thread", DummyThread):
+                    with contextlib.redirect_stdout(stdout):
+                        server.run_server("127.0.0.1", 0, db_path)
+
+            event_types = {event["event_type"] for event in store.snapshot("demo")["events"]}
+            self.assertNotIn("test.old", event_types)
+            self.assertIn("test.recent", event_types)
+            self.assertTrue(fake_servers)
+            self.assertTrue(fake_servers[0].closed)
+            self.assertIn("Pruned 1 event(s) older than 48 hours.", stdout.getvalue())
+
+    def test_shutdown_event_prune_prints_zero_count(self) -> None:
+        class EmptyPruneStore:
+            def prune_events_older_than(self, hours: int) -> int:
+                self.hours = hours
+                return 0
+
+        store = EmptyPruneStore()
+        stdout = io.StringIO()
+
+        with contextlib.redirect_stdout(stdout):
+            server._prune_shutdown_events(store)  # type: ignore[arg-type]
+
+        self.assertEqual(store.hours, server.EVENT_RETENTION_HOURS)
+        self.assertIn("Pruned 0 event(s) older than 48 hours.", stdout.getvalue())
+
     def test_listener_socket_inodes_match_requested_local_address(self) -> None:
         def listener_row(index: int, address: str, inode: str) -> str:
             return (
@@ -168,7 +252,7 @@ class ServerDefaultsTest(unittest.TestCase):
             httpd = self.start_server(store)
 
             with urllib.request.urlopen(
-                f"http://127.0.0.1:{httpd.server_address[1]}/static/app.js",
+                f"http://127.0.0.1:{httpd.server_address[1]}/static/app/main.js",
                 timeout=3,
             ) as response:
                 response.read()
@@ -293,6 +377,30 @@ class ServerDefaultsTest(unittest.TestCase):
                 body = json.loads(response.read().decode("utf-8"))
 
             self.assertEqual(body["app"], app_metadata)
+
+    def test_get_card_returns_archived_card(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = KanbanStore(Path(tmp) / "kanban.sqlite3")
+            card = store.create_card(
+                {
+                    "board_slug": "demo",
+                    "title": "Archived card",
+                    "description": "Still openable from Activity.",
+                    "archived": True,
+                }
+            )
+            httpd = self.start_server(store)
+
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{httpd.server_address[1]}/api/cards/{card['id']}",
+                timeout=3,
+            ) as response:
+                body = json.loads(response.read().decode("utf-8"))
+
+            self.assertEqual(response.status, 200)
+            self.assertEqual(body["id"], card["id"])
+            self.assertEqual(body["title"], "Archived card")
+            self.assertTrue(body["archived"])
 
     def test_snapshot_unknown_board_uses_server_preferred_board(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -443,6 +551,47 @@ class ServerDefaultsTest(unittest.TestCase):
             self.assertTrue(
                 any(event["event_type"] == "workflow.started" for event in snapshot["events"])
             )
+
+    def test_get_events_pages_activity_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = KanbanStore(Path(tmp) / "kanban.sqlite3")
+            self.register_demo_project(store)
+            httpd = self.start_server(store)
+            for index in range(12):
+                store.create_event(
+                    {
+                        "board_slug": "demo",
+                        "event_type": f"activity.{index:02d}",
+                        "message": str(index),
+                    }
+                )
+
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{httpd.server_address[1]}/api/events?board=demo&limit=10",
+                timeout=3,
+            ) as response:
+                first_page = json.loads(response.read().decode("utf-8"))
+            with urllib.request.urlopen(
+                (
+                    f"http://127.0.0.1:{httpd.server_address[1]}/api/events"
+                    f"?board=demo&limit=10&before_id={first_page['next_before_id']}"
+                ),
+                timeout=3,
+            ) as response:
+                second_page = json.loads(response.read().decode("utf-8"))
+
+            self.assertEqual(
+                [event["event_type"] for event in first_page["events"]],
+                [f"activity.{index:02d}" for index in range(2, 12)],
+            )
+            self.assertTrue(first_page["has_more"])
+            self.assertEqual(first_page["next_before_id"], first_page["events"][0]["id"])
+            self.assertEqual(
+                [event["event_type"] for event in second_page["events"]],
+                ["activity.00", "activity.01"],
+            )
+            self.assertFalse(second_page["has_more"])
+            self.assertIsNone(second_page["next_before_id"])
 
     def test_post_card_run_now_creates_manual_workflow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

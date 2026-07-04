@@ -1,5 +1,98 @@
 # Changelog
 
+## 0.1.11 - 2026-07-04
+
+This release improves Activity handling, event retention, branch guidance,
+code standards, release-branch file-size compliance, static app module
+organization, snapshot CLI inspection, and concurrent local SQLite
+coordination.
+
+Public commits:
+
+- `473deec` prunes SQLite event rows older than the retention window during
+  graceful server shutdown.
+- `e02dc50` prints the number of pruned event rows during shutdown cleanup.
+- `071ba50` changes the Activity panel to load the latest 10 events first and
+  fetch older events in pages of 10 while scrolling inside the panel.
+- `1d805e5` fixes Activity panel scrolling and row wrapping so event text stays
+  readable in narrow layouts.
+- `b401d68` links Activity events to related cards, opens archived cards on
+  demand, and shows a picker when an event references multiple cards.
+- `8991af8` clarifies that same-topic local follow-up work may stay on the
+  existing card branch instead of forcing redundant sibling branches.
+- `aef48a5` merges the `CK-0346` event retention work into `release/0.1.11`.
+- `e1cffad` merges the `CK-0349` branch-policy update into `release/0.1.11`.
+- `e6819c4` merges the `CK-0347` Activity pagination work into
+  `release/0.1.11`.
+- `bfd6c4f` merges and optimizes the `CK-0348` Activity card-link work with the
+  paginated Activity implementation.
+- `e4dc550` adds explicit release-branch code standards for file size,
+  responsibility splits, naming, and behavior-preserving cleanup.
+- `248a8a5` enables concurrent SQLite store access with async-capable store
+  entrypoints, WAL/busy-timeout connection settings, and concurrency tests.
+- `8e365b8` merges the `CK-0354` async SQLite store work into
+  `release/0.1.11`.
+- `619326a` refactors oversized release-branch frontend and test files into
+  responsibility-focused modules so tracked code assets stay below the hard
+  1000-line cap.
+- `6c3e236` moves browser app JavaScript assets into a Vue-inspired
+  `static/app/` folder with lowercase/kebab-case browser script filenames and
+  updates script/test references.
+- `6f02591` merges the `CK-0358` static app module move into
+  `release/0.1.11`.
+- `bd92d1a` fixes release CI JavaScript syntax paths for the moved static app
+  files and includes dashboard static assets in built wheels.
+- `dc9e8ca` adds a regression test that keeps dashboard script paths and CI
+  JavaScript syntax targets aligned.
+- `a3198f7` adds `snapshot --done-limit` to the project CLI so agents can
+  inspect completed-card history without querying SQLite directly.
+- `40ed5e0` merges the `CK-0368` snapshot done-limit CLI fix into
+  `release/0.1.11`.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Kept only recent Activity events in the initial snapshot and added a paged
+  `/api/events` flow for loading older events without growing the side rail
+  unexpectedly.
+- Made Activity events clickable when they reference cards, including events
+  tied to archived cards and events that need a multi-card picker.
+- Centralized Activity event related-card enrichment so both initial snapshots
+  and older event pages expose the same clickable card metadata.
+- Added shutdown cleanup for local coordination events older than 48 hours and
+  a terminal summary of how many rows were pruned.
+- Updated project and packaged skill guidance so related follow-up requests
+  from the same local user can reuse an existing same-topic feature branch when
+  that reduces redundant code and merge conflicts.
+- Added a release-branch `Code Standards` instruction covering file-size
+  limits, domain-responsibility splits, avoiding generic `mixin` names for
+  split-out code, and removing unnecessary code without accidental behavior
+  changes.
+- Improved local SQLite coordination for concurrent agents, CLI commands, and
+  server handlers by removing the process-local store serialization point,
+  adding async-capable store wrappers, and strengthening SQLite busy/WAL
+  connection settings.
+- Split oversized release-branch frontend and test modules by responsibility
+  so every tracked Python, JavaScript, CSS, and HTML code asset stays below the
+  hard 1000-line limit.
+- Organized browser app JavaScript under `kanban_server/static/app/` with
+  lowercase/kebab-case browser script filenames, including the dashboard
+  entrypoint at `/static/app/main.js`.
+- Fixed release CI and package metadata so the moved static app scripts are
+  checked in CI and included in built wheels.
+- Added `--done-limit` to the `snapshot` project CLI command with
+  overview-compatible `0`, `N`, and `-1` semantics for completed-card history.
+
+AI disclosure:
+
+This release was developed, reviewed, and prepared with help from AI agents
+using GPT-5, coordinated through the Codex Kanban workflow.
+
 ## 0.1.10 - 2026-07-04
 
 This release strengthens continuous development coordination by separating

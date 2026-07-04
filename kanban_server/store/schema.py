@@ -11,6 +11,7 @@ from .support import (
     LANES,
     LOCAL_COMMENT_AUTHOR_NAME,
     MAX_ACTIVE_IMPLEMENTERS_PER_PROJECT,
+    SQLITE_BUSY_TIMEOUT_SECONDS,
     utc_now,
 )
 
@@ -25,10 +26,13 @@ else:
 class SchemaStoreMixin(_StoreMixinContract):
     def _open_connection(self) -> sqlite3.Connection:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(self.db_path), timeout=30)
+        conn = sqlite3.connect(str(self.db_path), timeout=SQLITE_BUSY_TIMEOUT_SECONDS)
         conn.row_factory = sqlite3.Row
+        busy_timeout_ms = max(1, SQLITE_BUSY_TIMEOUT_SECONDS) * 1000
+        conn.execute(f"PRAGMA busy_timeout = {busy_timeout_ms}")
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
         return conn
 
     @contextmanager

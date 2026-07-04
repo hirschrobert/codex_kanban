@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sqlite3
-import threading
 from contextlib import AbstractContextManager
 from datetime import datetime
 from pathlib import Path
@@ -17,7 +16,7 @@ class StoreMixinContract:
 
     db_path: Path
     preferred_board_slug: str | None
-    _lock: threading.RLock
+    _lock: Any
 
     def _active_project_for_board(
         self,
@@ -48,6 +47,14 @@ class StoreMixinContract:
         self,
         conn: sqlite3.Connection,
         cards: list[dict[str, Any]],
+    ) -> None: ...
+
+    def _attach_event_related_cards(
+        self,
+        conn: sqlite3.Connection,
+        events: list[dict[str, Any]],
+        *,
+        board_slug: str,
     ) -> None: ...
 
     def _backfill_card_links(self, conn: sqlite3.Connection) -> None: ...
@@ -102,6 +109,15 @@ class StoreMixinContract:
         column: str,
         definition: str,
     ) -> None: ...
+
+    def _event_page(
+        self,
+        conn: sqlite3.Connection,
+        board_slug: str,
+        *,
+        limit: int = ...,
+        before_id: int | None = None,
+    ) -> dict[str, Any]: ...
 
     def _event_from_row(self, row: sqlite3.Row | None) -> dict[str, Any]: ...
 
@@ -266,7 +282,19 @@ class StoreMixinContract:
 
     def get_card(self, card_id: int) -> dict[str, Any] | None: ...
 
+    def list_events(
+        self,
+        board_slug: str | None = None,
+        *,
+        limit: int = ...,
+        before_id: int | None = None,
+    ) -> dict[str, Any]: ...
+
     def project_for_path(self, path: str | Path) -> dict[str, Any] | None: ...
+
+    def prune_events_before(self, cutoff: str) -> int: ...
+
+    def prune_events_older_than(self, hours: int = ..., *, now: Any = None) -> int: ...
 
     def refresh_project_agents(self, board_slug: str) -> dict[str, Any] | None: ...
 

@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from .app_metadata import app_metadata as current_app_metadata
 from .project.registration import auto_register_payload_for_cwd
 from .store.core import KanbanStore
-from .store.support import DEFAULT_DB_PATH, DEFAULT_OVERVIEW_DONE_LIMIT
+from .store.support import DEFAULT_DB_PATH, DEFAULT_OVERVIEW_DONE_LIMIT, EVENT_RETENTION_HOURS
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 DEFAULT_HOST = "127.0.0.1"
@@ -328,6 +328,23 @@ class KanbanHandler(BaseHTTPRequestHandler):
                     )
                 )
                 return
+            if parsed.path == "/api/events":
+                query = parse_qs(parsed.query)
+                board = (
+                    query.get("board", [None])[0]
+                    or self.kanban_server.default_board_slug
+                    or self.kanban_server.store.default_board_slug()
+                )
+                limit = self._int_query(query, "limit", default=10)
+                before_id = self._int_query(query, "before_id")
+                self._send_json(
+                    self.kanban_server.store.list_events(
+                        board,
+                        limit=limit,
+                        before_id=before_id if before_id > 0 else None,
+                    )
+                )
+                return
             if parsed.path == "/api/projects":
                 snapshot = self.kanban_server.store.snapshot(self.kanban_server.default_board_slug)
                 self._send_json(
@@ -430,6 +447,15 @@ class KanbanHandler(BaseHTTPRequestHandler):
                     include_archived=include_archived,
                     archived_only=archived_only,
                 )
+                return
+            parts = parsed.path.strip("/").split("/")
+            if len(parts) == 3 and parts[:2] == ["api", "cards"]:
+                card_id = int(parts[2])
+                card = self.kanban_server.store.get_card(card_id)
+                if not card:
+                    self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                self._send_json(card)
                 return
             self._serve_static(parsed.path)
         except Exception as exc:
@@ -846,6 +872,18 @@ def _preferred_board_slug(store: KanbanStore) -> str | None:
     return project["board_slug"] if project else None
 
 
+def _prune_shutdown_events(store: KanbanStore) -> None:
+    try:
+        pruned = store.prune_events_older_than(EVENT_RETENTION_HOURS)
+    except Exception as exc:
+        sys.stderr.write(f"Codex Kanban event prune error during shutdown: {exc}\n")
+        return
+    print(
+        f"Pruned {pruned} event(s) older than {EVENT_RETENTION_HOURS} hours.",
+        flush=True,
+    )
+
+
 def run_server(host: str, port: int, db_path: Path) -> None:
     store = KanbanStore(db_path)
     default_board_slug = _preferred_board_slug(store)
@@ -868,6 +906,7 @@ def run_server(host: str, port: int, db_path: Path) -> None:
     finally:
         server.scheduler_stop.set()
         scheduler.join(timeout=2)
+        _prune_shutdown_events(store)
         server.server_close()
 
 

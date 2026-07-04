@@ -35,6 +35,10 @@ Override it with:
 CODEX_KANBAN_DB=/path/to/kanban.sqlite3 python3 -m kanban_server
 ```
 
+On graceful shutdown, including Ctrl+C in a Linux terminal, the server prunes
+event rows older than 48 hours from the SQLite database. Cards and card
+comments are retained.
+
 When running CLI examples from a source checkout, set `KANBAN_REPO` to the
 checkout that contains `kanban_server`. From inside this repository the Git root
 fallback is enough; from another project, set `CODEX_KANBAN_REPO` first:
@@ -136,12 +140,16 @@ CLI, and HTTP API.
 When a card moves into active implementation, set `Target Branch` to the
 upcoming release branch that has not been released yet. If the project has no
 such release branch, create one. Workflow automation must not target `main` or
-`master`. Each feature or fix implementation card should also record one
-card-specific `Feature Branch`, usually `feature/<CARD-ID>-short-title` or
+`master`. Feature or fix implementation cards should also record a
+`Feature Branch`, usually `feature/<CARD-ID>-short-title` or
 `fix/<CARD-ID>-short-title`, created from the target release branch and ahead of
-`main`. Do not share one feature branch across unrelated cards. Coordination,
-review, release, and read-only audit cards can omit their own write branch, but
-they should record which implementation branch or release branch they inspect.
+`main`. If a same-user local follow-up continues the same object, UI surface,
+domain concept, or cohesive topic on an unmerged branch, reuse that branch and
+record it on the related child/sibling card instead of creating a competing
+branch. Create a new feature branch for unrelated, independently reviewable,
+different-release, or different-owner work. Coordination, review, release, and
+read-only audit cards can omit their own write branch, but they should record
+which implementation branch or release branch they inspect.
 By convention, feature branches or worktrees can live under:
 
 ```text
@@ -334,10 +342,13 @@ Put this durable instruction in a new project's `AGENTS.md`:
   profiles, instead of spawning every profile by default, and explain why
   delegation was used or skipped.
 - Treat different user requests, implementation scopes, and agents as separate
-  contributors. Each feature/fix implementation card needs its own
-  card-specific branch with commits before handoff. Merge it to the release
-  branch only after human final review, then rebase or refresh remaining active
-  feature/fix branches from that release branch.
+  contributors in cards and comments. Same-user local follow-ups that continue
+  the same object or cohesive topic may share the existing unmerged branch, with
+  each card recording that branch and contributing focused commits before
+  handoff. Unrelated or independently reviewable work needs a new branch. Merge
+  feature/fix branches to the release branch only after human final review, then
+  rebase or refresh remaining active feature/fix branches from that release
+  branch.
 - Do not create Kanban cards or workflow updates for trivial local operations,
   quick command checks, or discussion that does not change project work.
 - For exploratory feature discussion, Kanban is optional and should stay light:
@@ -433,11 +444,14 @@ Use `--clear-blocker` when a resolved blocker should be removed while moving
 or handing off a card. Passing `--blocker ""` also clears the blocker text;
 omitting `--blocker` leaves existing blocker text unchanged.
 
-For feature/fix work, the `--feature-branch` value should be unique to the
-implementation card and should point to the branch that contains the card's
-commits. Do not hand off unstaged implementation files. After a human-approved
-merge updates the release branch, refresh every other active feature/fix branch
-from that release branch before more edits and record the new SHA/checks.
+For feature/fix work, the `--feature-branch` value should point to the branch
+that contains the card's commits. It is usually unique to the implementation
+card, but it may intentionally match another unmerged card when the newer card
+is a same-user local follow-up on the same object or cohesive topic and shared
+review reduces duplicate edits or conflicts. Do not hand off unstaged
+implementation files. After a human-approved merge updates the release branch,
+refresh every other active feature/fix branch from that release branch before
+more edits and record the new SHA/checks.
 
 Add a durable note to a card:
 
@@ -541,14 +555,16 @@ commit, publish, migrate, sign, deploy, or ask for human approval.
 
 ## Release Integration
 
-For public releases, feature and fix cards first live on their own
-card-specific branches. After human final review, merge approved feature/fix
-branches into `release/<version>` and rebase or otherwise refresh the remaining
-active feature/fix branches from that updated release branch. Keep release
-metadata commits directly on `release/<version>`. Create the no-fast-forward
-merge commit locally before the first public push for that release. The merge
-commit should use the current public `main` as first parent and the release
-branch tip as second parent. Push that merge commit to `release/<version>` once
+For public releases, feature and fix cards first live on explicit topic/card
+branches. Same-topic follow-up cards may share one unmerged branch when they are
+reviewed as a cohesive change. After human final review, merge approved
+feature/fix branches into `release/<version>` and rebase or otherwise refresh
+the remaining active feature/fix branches from that updated release branch. Keep
+release metadata commits directly on `release/<version>`. Create the
+no-fast-forward merge commit locally before the first public push for that
+release. The merge commit should use the current public `main` as first parent
+and the release branch tip as second parent. Push that merge commit to
+`release/<version>` once
 and wait for CI on that exact SHA, then fast-forward `main` to the same merge
 SHA and tag that merge commit.
 
@@ -635,11 +651,13 @@ Participating AI agents should:
   than one card, and should say so visibly;
 - avoid parallel implementation work with overlapping write scope. Overlap
   means the same target repo/branch without distinct feature branches, same
-  feature branch, same worktree path, or same declared files. If overlap is
-  likely, block or wait one card until the other card records a handoff SHA;
-- give each feature/fix implementation card its own card-specific branch with
-  one or more commits before handoff. Do not combine unrelated cards on one
-  branch and do not treat loose unstaged files as handoff state;
+  feature branch, same worktree path, or same declared files. If overlap is a
+  same-user local follow-up on the same object or cohesive topic, continue on
+  the existing unmerged branch and record the shared branch on each related card;
+  otherwise block or wait one card until the other card records a handoff SHA;
+- give each feature/fix implementation topic an explicit branch with one or more
+  focused commits before handoff. Do not combine unrelated cards on one branch
+  and do not treat loose unstaged files as handoff state;
 - refresh feature branches/worktrees from the current target branch before
   continuing unfinished work after another card lands. Integrity of the
   integrated codebase takes priority over preserving local progress;

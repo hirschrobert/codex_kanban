@@ -30,13 +30,18 @@ human developers, the main AI agent, and optional AI subagents.
   still disallows spawning, record the cards and surface the blocker instead of
   silently folding delegated work into the parent agent.
 - Treat different user requests, implementation scopes, and agents as separate
-  contributors. Feature/fix implementation cards must use their own
-  card-specific `feature/<CARD-ID>-...` or `fix/<CARD-ID>-...` branch, based on
-  the current release branch and ahead of `main`, with one or more commits before
-  handoff. Do not combine unrelated cards on one branch or leave unstaged
-  implementation changes as handoff state. Coordination, review, release, and
-  read-only audit cards do not need their own write branch, but they must record
-  which implementation branch or release branch they inspect.
+  contributors in the cards, but do not force a new branch when the human's
+  local follow-up request continues the same object, UI surface, domain concept,
+  or cohesive topic on an unmerged feature/fix branch for the same release.
+  In that case, continue on the existing topic branch, create or update a
+  related child/sibling card that records the shared branch, and add focused
+  commits for the new card. Create a new `feature/<CARD-ID>-...` or
+  `fix/<CARD-ID>-...` branch when the work is unrelated, independently
+  reviewable, from a different release/deployment scope, or would make the
+  current topic branch too broad. Never combine unrelated cards on one branch or
+  leave unstaged implementation changes as handoff state. Coordination, review,
+  release, and read-only audit cards do not need their own write branch, but
+  they must record which implementation branch or release branch they inspect.
 - Merge a feature/fix branch into the upcoming release branch only after human
   final review/approval. After any branch lands on the release branch, all other
   active feature/fix branches must rebase or otherwise refresh from that release
@@ -55,6 +60,15 @@ human developers, the main AI agent, and optional AI subagents.
 - The SQLite database is local coordination state. Do not treat it as production
   application data.
 
+## Code Standards
+
+- Keep files under 600 lines when practical and below 1000 lines always. Split
+  larger responsibilities into clearly named modules by domain responsibility.
+- Avoid names like `mixin` for split-out classes, files, or folders. If
+  composition needs explanation, use a concise docstring.
+- Remove unnecessary code while refactoring, but do not change behavior unless
+  the task requires it.
+
 ## Development Rules
 
 - Prefer the existing standard-library Python implementation unless a task
@@ -62,9 +76,6 @@ human developers, the main AI agent, and optional AI subagents.
 - Follow a model-view-controller structure: keep persistent data and domain
   rules in model/store modules, HTTP/CLI/user action orchestration in controller
   modules, and dashboard rendering/static presentation in view modules.
-- Code files SHOULD stay around 600 lines of code and MUST NOT exceed 1000
-  lines of code. Split files by responsibility before they cross the hard
-  ceiling.
 - Treat Black and Ruff findings as design feedback, not just warnings to
   silence. Prefer cohesive packages, single-responsibility modules, shared
   helpers, and explicit public APIs over duplicated code, compatibility glue, or
@@ -93,8 +104,8 @@ human developers, the main AI agent, and optional AI subagents.
   `main` release-merge fast-forward ref, or release tags. Do not mirror every
   local ref from a development repository.
 - The full CI workflow runs on release branches, not on main pushes. Keep
-  feature and fix work on card-specific branches until human-approved merge to
-  `release/<version>`. Keep release metadata commits on `release/<version>`,
+  feature and fix work on explicit topic/card branches until human-approved merge
+  to `release/<version>`. Keep release metadata commits on `release/<version>`,
   then create an explicit no-fast-forward release merge commit before the first
   public push for that release. The merge commit's first parent is the previous
   `main` and its second parent is the release branch tip. Push that merge commit

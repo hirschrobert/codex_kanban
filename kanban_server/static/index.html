@@ -228,6 +228,19 @@ Acceptance criteria:
       </form>
     </dialog>
 
+    <dialog id="event-card-picker-dialog" class="dialog small-dialog">
+      <div class="dialog-form">
+        <div class="dialog-header">
+          <h2>Open Card</h2>
+          <button class="icon-button event-card-picker-close" type="button">X</button>
+        </div>
+        <div id="event-card-picker-list" class="event-card-picker-list"></div>
+        <div class="dialog-actions">
+          <button class="ghost-button event-card-picker-close" type="button">Cancel</button>
+        </div>
+      </div>
+    </dialog>
+
     <dialog id="participant-dialog" class="dialog small-dialog">
       <form id="participant-form" method="dialog" class="dialog-form">
         <div class="dialog-header">
@@ -275,9 +288,10 @@ Acceptance criteria:
       </div>
     </dialog>
 
-    <script src="/static/app_state.js"></script>
-    <script src="/static/app_api.js"></script>
-    <script src="/static/app_model.js"></script>
-    <script src="/static/app.js"></script>
+    <script src="/static/app/state.js"></script>
+    <script src="/static/app/api.js"></script>
+    <script src="/static/app/model.js"></script>
+    <script src="/static/app/project-settings.js"></script>
+    <script src="/static/app/main.js"></script>
   </body>
 </html>

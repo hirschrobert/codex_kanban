@@ -14,6 +14,9 @@ const {
   participantKind,
   commentAuthorName,
   cardById,
+  relatedCardsForEvent,
+  relatedCardLabel,
+  relatedCardSummary,
   archiveSelectionKey,
   archiveSelection,
   archiveActionTargets,
@@ -53,18 +56,63 @@ const cardCommentsEl = document.querySelector("#card-comments");
 const addCommentButton = document.querySelector("#add-comment-button");
 const participantDialog = document.querySelector("#participant-dialog");
 const participantForm = document.querySelector("#participant-form");
+const eventCardPickerDialog = document.querySelector("#event-card-picker-dialog");
+const eventCardPickerListEl = document.querySelector("#event-card-picker-list");
 const settingsDialog = document.querySelector("#settings-dialog");
 const settingsLimitsEl = document.querySelector("#settings-agent-limits");
 const settingsProjectListEl = document.querySelector("#settings-project-list");
+
+const projectSettings = window.KanbanProjectSettings.createProjectSettingsController({
+  settingsDialog,
+  settingsLimitsEl,
+  settingsProjectListEl,
+  resetBoardIfCurrent,
+  refresh,
+  connectEvents,
+  escapeHtml,
+});
 
 function setLiveState(label, className) {
   liveStateEl.textContent = label;
   liveStateEl.className = `live-pill ${className || ""}`.trim();
 }
 
+function eventSortValue(event) {
+  return Number(event?.id || 0);
+}
+
+function mergeActivityEvents(...groups) {
+  const byId = new Map();
+  groups.flat().forEach((event) => {
+    if (!event) return;
+    const key = event.id == null ? `${event.created_at || ""}-${event.event_type || ""}` : String(event.id);
+    byId.set(key, event);
+  });
+  return [...byId.values()].sort((left, right) => eventSortValue(left) - eventSortValue(right));
+}
+
+function resetActivityPaging() {
+  state.activityHasMore = false;
+  state.activityLoading = false;
+  state.activityExtended = false;
+}
+
+function prepareActivitySnapshot(snapshot) {
+  const previous = state.snapshot;
+  const previousBoard = previous?.board?.slug || "";
+  const nextBoard = snapshot?.board?.slug || "";
+  const sameBoard = previousBoard && previousBoard === nextBoard;
+  if (state.activityExtended && sameBoard) {
+    snapshot.events = mergeActivityEvents(previous.events || [], snapshot.events || []);
+    return snapshot;
+  }
+  resetActivityPaging();
+  state.activityHasMore = Boolean(snapshot?.events_has_more);
+  return snapshot;
+}
 
 function render(snapshot) {
-  state.snapshot = snapshot;
+  state.snapshot = prepareActivitySnapshot(snapshot);
   const activeBoardSlugs = new Set((snapshot.projects || []).map((project) => project.board_slug));
   if (
     snapshot.board?.slug &&
@@ -315,105 +363,79 @@ function renderParticipants() {
 
 function renderActivity() {
   const events = (state.snapshot?.events || []).slice().reverse();
-  const visibleEvents = events.slice(0, state.activityLimit);
   activityEl.innerHTML = "";
-  visibleEvents.forEach((event) => {
-    const row = document.createElement("li");
-    row.className = "activity-row";
+  activityEl.setAttribute("aria-busy", state.activityLoading ? "true" : "false");
+  events.forEach((event) => {
+    const item = document.createElement("li");
+    item.className = "activity-item";
+    const row = document.createElement("button");
+    const relatedCards = relatedCardsForEvent(event);
+    const cardSummary = relatedCardSummary(relatedCards);
+    row.type = "button";
+    row.className = `activity-row ${relatedCards.length ? "activity-row-linked" : ""}`;
+    row.disabled = !relatedCards.length;
+    row.title = relatedCards.length ? `Open ${cardSummary}` : "";
     row.innerHTML = `
       <span class="status-dot"></span>
       <span class="activity-main">
         <span class="activity-message">${escapeHtml(event.event_type)} ${escapeHtml(normalizeNewlines(event.message || ""))}</span>
-        <span class="activity-meta">${escapeHtml(normalizeNewlines(event.card_external_id || ""))} ${escapeHtml(event.participant_id || "")} ${timeAgo(event.created_at)}</span>
+        <span class="activity-meta">${escapeHtml(normalizeNewlines(event.card_external_id || ""))} ${escapeHtml(event.participant_id || "")} ${timeAgo(event.created_at)}${cardSummary ? ` · ${escapeHtml(cardSummary)}` : ""}</span>
       </span>
     `;
-    activityEl.appendChild(row);
+    if (relatedCards.length) {
+      row.addEventListener("click", () => openEventCards(event));
+    }
+    item.appendChild(row);
+    activityEl.appendChild(item);
   });
 }
 
-function renderSettingsProjects(projects) {
-  const limits = state.snapshot?.agent_limits || {};
-  settingsLimitsEl.innerHTML = `
-    <span class="settings-limit-title">Agent Concurrency</span>
-    <span class="settings-project-meta">
-      Project active agents: ${Number(limits.max_active_agents_per_project || 0) || "unlimited"}
-      · Active project implementers: ${Number(limits.max_active_implementers_per_project || 0) || "unlimited"}
-      · Default implementers: ${Number(limits.default_max_active_implementers_per_project || 0) || "unlimited"}
-      · Global active agents: ${Number(limits.max_active_agents_global || 0) || "unlimited"}
-      · Stale after: ${Number(limits.stale_after_seconds || 0) || "disabled"}s
-    </span>
-  `;
-  settingsProjectListEl.innerHTML = "";
-  if (!projects.length) {
-    const row = document.createElement("div");
-    row.className = "settings-project-row empty";
-    row.textContent = "No registered projects";
-    settingsProjectListEl.appendChild(row);
+async function openEventCard(reference) {
+  if (!reference?.id) return;
+  const visibleCard = cardById(reference?.id);
+  if (visibleCard) {
+    openCardDialog(visibleCard);
     return;
   }
+  try {
+    const card = await api(`/api/cards/${encodeURIComponent(reference.id)}`);
+    openCardDialog(card);
+  } catch (error) {
+    window.alert(`Could not open ${text(reference?.external_id, "card")}: ${error.message}`);
+  }
+}
 
-  projects.forEach((project) => {
-    const removed = Boolean(project.removed_at);
-    const row = document.createElement("div");
-    row.className = `settings-project-row ${removed ? "removed" : ""}`;
-    row.innerHTML = `
-      <div class="settings-project-main">
-        <span class="settings-project-title">${escapeHtml(project.display_name)}</span>
-        <span class="settings-project-meta">
-          ${escapeHtml(project.slug)} · ${escapeHtml(project.board_slug)} · ${removed ? "removed" : "active"}
-        </span>
-        <span class="settings-project-meta">
-          ${Number(project.card_count || 0)} cards · ${Number(project.participant_count || 0)} participants
-        </span>
-        <label class="settings-number-field">
-          <span>Active Implementers</span>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value="${Number(project.max_active_implementers || 0)}"
-            data-setting="max_active_implementers"
-            ${removed ? "disabled" : ""}
-          >
-        </label>
-      </div>
-      <div class="settings-project-actions"></div>
+function openEventCards(event) {
+  const relatedCards = relatedCardsForEvent(event);
+  if (!relatedCards.length) return;
+  if (relatedCards.length === 1) {
+    openEventCard(relatedCards[0]);
+    return;
+  }
+  renderEventCardPicker(relatedCards);
+  eventCardPickerDialog.showModal();
+}
+
+function renderEventCardPicker(cards) {
+  eventCardPickerListEl.innerHTML = "";
+  cards.forEach((card) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "event-card-picker-option";
+    button.title = relatedCardLabel(card);
+    button.innerHTML = `
+      <span class="event-card-picker-number">${escapeHtml(text(card.external_id, `#${card.id}`))}</span>
+      <span class="event-card-picker-main">
+        <span class="event-card-picker-title">${escapeHtml(text(card.title, "Untitled"))}</span>
+        <span class="event-card-picker-meta">${escapeHtml(text(card.status, "unknown"))}${card.archived ? ` <span class="chip archived-chip">archived</span>` : ""}</span>
+      </span>
     `;
-
-    const actions = row.querySelector(".settings-project-actions");
-    const saveButton = document.createElement("button");
-    saveButton.type = "button";
-    saveButton.className = "ghost-button";
-    saveButton.textContent = "Save";
-    saveButton.disabled = removed;
-    saveButton.addEventListener("click", () => saveProjectSettings(project, row));
-
-    const removeButton = document.createElement("button");
-    removeButton.type = "button";
-    removeButton.className = "ghost-button";
-    removeButton.textContent = removed ? "Removed" : "Remove";
-    removeButton.disabled = removed;
-    removeButton.addEventListener("click", () => removeProject(project));
-
-    const pruneButton = document.createElement("button");
-    pruneButton.type = "button";
-    pruneButton.className = "ghost-button danger-button";
-    pruneButton.textContent = "Prune";
-    pruneButton.addEventListener("click", () => pruneProject(project));
-
-    actions.append(saveButton, removeButton, pruneButton);
-    settingsProjectListEl.appendChild(row);
+    button.addEventListener("click", () => {
+      eventCardPickerDialog.close();
+      openEventCard(card);
+    });
+    eventCardPickerListEl.appendChild(button);
   });
-}
-
-async function loadSettingsProjects() {
-  const data = await api("/api/projects");
-  renderSettingsProjects(data.all_projects || data.projects || []);
-}
-
-async function openSettingsDialog() {
-  await loadSettingsProjects();
-  settingsDialog.showModal();
 }
 
 function populateCardSelects() {
@@ -739,43 +761,6 @@ function resetBoardIfCurrent(boardSlug) {
   }
 }
 
-async function removeProject(project) {
-  const ok = window.confirm(`Remove ${project.display_name} from the project picker?`);
-  if (!ok) return;
-  await api(`/api/projects/${encodeURIComponent(project.slug)}/remove`, { method: "POST" });
-  resetBoardIfCurrent(project.board_slug);
-  await refresh();
-  connectEvents();
-  await loadSettingsProjects();
-}
-
-async function pruneProject(project) {
-  const ok = window.confirm(
-    `Prune ${project.display_name} and delete its cards, events, and participants?`
-  );
-  if (!ok) return;
-  await api(`/api/projects/${encodeURIComponent(project.slug)}/prune`, { method: "POST" });
-  resetBoardIfCurrent(project.board_slug);
-  await refresh();
-  connectEvents();
-  await loadSettingsProjects();
-}
-
-async function saveProjectSettings(project, row) {
-  const input = row.querySelector('[data-setting="max_active_implementers"]');
-  const maxActiveImplementers = Number.parseInt(input.value, 10);
-  if (!Number.isInteger(maxActiveImplementers) || maxActiveImplementers < 0) {
-    window.alert("Active Implementers must be 0 or greater.");
-    return;
-  }
-  await api(`/api/projects/${encodeURIComponent(project.slug)}/settings`, {
-    method: "PATCH",
-    body: JSON.stringify({ max_active_implementers: maxActiveImplementers }),
-  });
-  await refresh();
-  await loadSettingsProjects();
-}
-
 async function refresh() {
   const params = new URLSearchParams();
   if (state.board) params.set("board", state.board);
@@ -802,11 +787,51 @@ function connectEvents() {
   events.addEventListener("error", () => setLiveState("Reconnecting", "offline"));
 }
 
+async function loadMoreActivityEvents() {
+  if (state.activityLoading || !state.activityHasMore || !state.snapshot) {
+    return;
+  }
+  const events = state.snapshot.events || [];
+  const beforeId = events.length ? events[0].id : state.snapshot.events_next_before_id;
+  if (!beforeId) {
+    state.activityHasMore = false;
+    return;
+  }
+  state.activityLoading = true;
+  renderActivity();
+  try {
+    const params = new URLSearchParams();
+    const board = state.snapshot?.board?.slug || state.board;
+    if (board) params.set("board", board);
+    params.set("limit", String(state.activityPageSize));
+    params.set("before_id", String(beforeId));
+    const page = await api(`/api/events?${params.toString()}`);
+    state.snapshot.events = mergeActivityEvents(page.events || [], state.snapshot.events || []);
+    state.snapshot.events_has_more = Boolean(page.has_more);
+    state.snapshot.events_next_before_id = page.next_before_id || null;
+    state.activityHasMore = Boolean(page.has_more);
+    state.activityExtended = true;
+  } catch (error) {
+    console.error(error);
+  } finally {
+    state.activityLoading = false;
+    renderActivity();
+  }
+}
+
+function loadActivityOnScroll(element) {
+  element.addEventListener("scroll", () => {
+    const nearEnd = element.scrollTop + element.clientHeight >= element.scrollHeight - 12;
+    if (!nearEnd) return;
+    loadMoreActivityEvents();
+  });
+}
+
 async function switchProject(event) {
   state.board = event.target.value;
   localStorage.setItem("codex-kanban-board", state.board);
   state.participantLimit = 10;
-  state.activityLimit = 10;
+  resetActivityPaging();
   clearArchiveSelections();
   setLiveState("Switching", "");
   await refresh();
@@ -816,6 +841,7 @@ async function switchProject(event) {
 async function toggleArchived(event) {
   state.showArchived = event.target.checked;
   localStorage.setItem("codex-kanban-show-archived", state.showArchived ? "1" : "0");
+  resetActivityPaging();
   clearArchiveSelections();
   await refresh();
   connectEvents();
@@ -875,7 +901,7 @@ function escapeHtml(value) {
 
 document.querySelector("#new-card-button").addEventListener("click", () => openCardDialog());
 document.querySelector("#new-participant-button").addEventListener("click", () => openParticipantDialog());
-document.querySelector("#settings-button").addEventListener("click", () => openSettingsDialog());
+document.querySelector("#settings-button").addEventListener("click", () => projectSettings.openSettingsDialog());
 showArchivedToggleEl.addEventListener("change", toggleArchived);
 archiveActionButton.addEventListener("click", applyArchiveAction);
 deleteCardButton.addEventListener("click", deleteCurrentCard);
@@ -883,6 +909,9 @@ runCardNowButton.addEventListener("click", () => runCardNow());
 addCommentButton.addEventListener("click", addCurrentComment);
 settingsDialog.querySelectorAll(".settings-close").forEach((button) => {
   button.addEventListener("click", () => settingsDialog.close());
+});
+eventCardPickerDialog.querySelectorAll(".event-card-picker-close").forEach((button) => {
+  button.addEventListener("click", () => eventCardPickerDialog.close());
 });
 cardDialog.querySelectorAll(".dialog-cancel").forEach((button) => {
   button.addEventListener("click", () => closeDialogWithWarning(cardDialog, cardForm));
@@ -903,12 +932,7 @@ loadMoreOnScroll(
   () => (state.snapshot?.participants || []).length,
   renderParticipants
 );
-loadMoreOnScroll(
-  activityEl,
-  "activityLimit",
-  () => (state.snapshot?.events || []).length,
-  renderActivity
-);
+loadActivityOnScroll(activityEl);
 
 refresh().then(connectEvents).catch((error) => {
   setLiveState("Offline", "offline");
