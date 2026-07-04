@@ -3,8 +3,8 @@
 ## 0.1.11 - 2026-07-04
 
 This release improves Activity handling, event retention, branch guidance,
-code standards, release-branch file-size compliance, and concurrent local
-SQLite coordination.
+code standards, release-branch file-size compliance, static app module
+organization, and concurrent local SQLite coordination.
 
 Public commits:
 
@@ -34,6 +34,11 @@ Public commits:
 - `619326a` refactors oversized release-branch frontend and test files into
   responsibility-focused modules so tracked code assets stay below the hard
   1000-line cap.
+- `6c3e236` moves browser app JavaScript assets into a Vue-style
+  `static/app/` folder with kebab-case module names and updates script/test
+  references.
+- `6f02591` merges the `CK-0358` static app module move into
+  `release/0.1.11`.
 
 Release metadata note:
 
@@ -66,6 +71,9 @@ Changes:
 - Split oversized release-branch frontend and test modules by responsibility
   so every tracked Python, JavaScript, CSS, and HTML code asset stays below the
   hard 1000-line limit.
+- Organized browser app JavaScript under `kanban_server/static/app/` with
+  kebab-case module filenames, including the dashboard entrypoint at
+  `/static/app/main.js`.
 
 AI disclosure:
 
