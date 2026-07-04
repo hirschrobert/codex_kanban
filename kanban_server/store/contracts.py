@@ -50,6 +50,14 @@ class StoreMixinContract:
         cards: list[dict[str, Any]],
     ) -> None: ...
 
+    def _attach_event_related_cards(
+        self,
+        conn: sqlite3.Connection,
+        events: list[dict[str, Any]],
+        *,
+        board_slug: str,
+    ) -> None: ...
+
     def _backfill_card_links(self, conn: sqlite3.Connection) -> None: ...
 
     def _board_is_removed_project(self, conn: sqlite3.Connection, board_slug: str) -> bool: ...

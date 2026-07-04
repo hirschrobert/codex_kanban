@@ -378,6 +378,30 @@ class ServerDefaultsTest(unittest.TestCase):
 
             self.assertEqual(body["app"], app_metadata)
 
+    def test_get_card_returns_archived_card(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = KanbanStore(Path(tmp) / "kanban.sqlite3")
+            card = store.create_card(
+                {
+                    "board_slug": "demo",
+                    "title": "Archived card",
+                    "description": "Still openable from Activity.",
+                    "archived": True,
+                }
+            )
+            httpd = self.start_server(store)
+
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{httpd.server_address[1]}/api/cards/{card['id']}",
+                timeout=3,
+            ) as response:
+                body = json.loads(response.read().decode("utf-8"))
+
+            self.assertEqual(response.status, 200)
+            self.assertEqual(body["id"], card["id"])
+            self.assertEqual(body["title"], "Archived card")
+            self.assertTrue(body["archived"])
+
     def test_snapshot_unknown_board_uses_server_preferred_board(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store = KanbanStore(

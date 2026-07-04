@@ -64,6 +64,47 @@ window.Kanban = window.Kanban || {};
     return (state.snapshot?.cards || []).find((card) => String(card.id) === String(id));
   }
 
+  function relatedCardsForEvent(event) {
+    const related = Array.isArray(event?.related_cards) ? event.related_cards : [];
+    const cards = [];
+    const seen = new Set();
+    function add(card) {
+      if (!card) return;
+      const id = card.id == null ? "" : String(card.id);
+      const externalId = text(card.external_id);
+      const key = id ? `id:${id}` : externalId ? `external:${externalId}` : "";
+      if (!key || seen.has(key)) return;
+      cards.push(card);
+      seen.add(key);
+    }
+    related.forEach(add);
+    if (!cards.length) {
+      add(cardById(event?.card_id));
+      if (event?.card_external_id) {
+        add(
+          (state.snapshot?.cards || []).find(
+            (card) => String(card.external_id) === String(event.card_external_id)
+          )
+        );
+      }
+    }
+    return cards;
+  }
+
+  function relatedCardLabel(card) {
+    return `${text(card.external_id, card.id ? `#${card.id}` : "Card")} ${text(card.title)}`.trim();
+  }
+
+  function relatedCardSummary(cards) {
+    if (!cards.length) return "";
+    const archivedCount = cards.filter((card) => card.archived).length;
+    if (cards.length === 1) {
+      const card = cards[0];
+      return `${text(card.external_id, card.id ? `#${card.id}` : "Card")}${card.archived ? " archived" : ""}`;
+    }
+    return `${cards.length} cards${archivedCount ? `, ${archivedCount} archived` : ""}`;
+  }
+
   function archiveSelectionKey(card) {
     return String(card.id);
   }
@@ -300,6 +341,9 @@ window.Kanban = window.Kanban || {};
     participantKind,
     commentAuthorName,
     cardById,
+    relatedCardsForEvent,
+    relatedCardLabel,
+    relatedCardSummary,
     archiveSelectionKey,
     initialArchiveSelection,
     archiveSelection,

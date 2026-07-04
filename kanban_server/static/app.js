@@ -14,6 +14,9 @@ const {
   participantKind,
   commentAuthorName,
   cardById,
+  relatedCardsForEvent,
+  relatedCardLabel,
+  relatedCardSummary,
   archiveSelectionKey,
   archiveSelection,
   archiveActionTargets,
@@ -53,6 +56,8 @@ const cardCommentsEl = document.querySelector("#card-comments");
 const addCommentButton = document.querySelector("#add-comment-button");
 const participantDialog = document.querySelector("#participant-dialog");
 const participantForm = document.querySelector("#participant-form");
+const eventCardPickerDialog = document.querySelector("#event-card-picker-dialog");
+const eventCardPickerListEl = document.querySelector("#event-card-picker-list");
 const settingsDialog = document.querySelector("#settings-dialog");
 const settingsLimitsEl = document.querySelector("#settings-agent-limits");
 const settingsProjectListEl = document.querySelector("#settings-project-list");
@@ -351,16 +356,75 @@ function renderActivity() {
   activityEl.innerHTML = "";
   activityEl.setAttribute("aria-busy", state.activityLoading ? "true" : "false");
   events.forEach((event) => {
-    const row = document.createElement("li");
-    row.className = "activity-row";
+    const item = document.createElement("li");
+    item.className = "activity-item";
+    const row = document.createElement("button");
+    const relatedCards = relatedCardsForEvent(event);
+    const cardSummary = relatedCardSummary(relatedCards);
+    row.type = "button";
+    row.className = `activity-row ${relatedCards.length ? "activity-row-linked" : ""}`;
+    row.disabled = !relatedCards.length;
+    row.title = relatedCards.length ? `Open ${cardSummary}` : "";
     row.innerHTML = `
       <span class="status-dot"></span>
       <span class="activity-main">
         <span class="activity-message">${escapeHtml(event.event_type)} ${escapeHtml(normalizeNewlines(event.message || ""))}</span>
-        <span class="activity-meta">${escapeHtml(normalizeNewlines(event.card_external_id || ""))} ${escapeHtml(event.participant_id || "")} ${timeAgo(event.created_at)}</span>
+        <span class="activity-meta">${escapeHtml(normalizeNewlines(event.card_external_id || ""))} ${escapeHtml(event.participant_id || "")} ${timeAgo(event.created_at)}${cardSummary ? ` · ${escapeHtml(cardSummary)}` : ""}</span>
       </span>
     `;
-    activityEl.appendChild(row);
+    if (relatedCards.length) {
+      row.addEventListener("click", () => openEventCards(event));
+    }
+    item.appendChild(row);
+    activityEl.appendChild(item);
+  });
+}
+
+async function openEventCard(reference) {
+  if (!reference?.id) return;
+  const visibleCard = cardById(reference?.id);
+  if (visibleCard) {
+    openCardDialog(visibleCard);
+    return;
+  }
+  try {
+    const card = await api(`/api/cards/${encodeURIComponent(reference.id)}`);
+    openCardDialog(card);
+  } catch (error) {
+    window.alert(`Could not open ${text(reference?.external_id, "card")}: ${error.message}`);
+  }
+}
+
+function openEventCards(event) {
+  const relatedCards = relatedCardsForEvent(event);
+  if (!relatedCards.length) return;
+  if (relatedCards.length === 1) {
+    openEventCard(relatedCards[0]);
+    return;
+  }
+  renderEventCardPicker(relatedCards);
+  eventCardPickerDialog.showModal();
+}
+
+function renderEventCardPicker(cards) {
+  eventCardPickerListEl.innerHTML = "";
+  cards.forEach((card) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "event-card-picker-option";
+    button.title = relatedCardLabel(card);
+    button.innerHTML = `
+      <span class="event-card-picker-number">${escapeHtml(text(card.external_id, `#${card.id}`))}</span>
+      <span class="event-card-picker-main">
+        <span class="event-card-picker-title">${escapeHtml(text(card.title, "Untitled"))}</span>
+        <span class="event-card-picker-meta">${escapeHtml(text(card.status, "unknown"))}${card.archived ? ` <span class="chip archived-chip">archived</span>` : ""}</span>
+      </span>
+    `;
+    button.addEventListener("click", () => {
+      eventCardPickerDialog.close();
+      openEventCard(card);
+    });
+    eventCardPickerListEl.appendChild(button);
   });
 }
 
@@ -957,6 +1021,9 @@ runCardNowButton.addEventListener("click", () => runCardNow());
 addCommentButton.addEventListener("click", addCurrentComment);
 settingsDialog.querySelectorAll(".settings-close").forEach((button) => {
   button.addEventListener("click", () => settingsDialog.close());
+});
+eventCardPickerDialog.querySelectorAll(".event-card-picker-close").forEach((button) => {
+  button.addEventListener("click", () => eventCardPickerDialog.close());
 });
 cardDialog.querySelectorAll(".dialog-cancel").forEach((button) => {
   button.addEventListener("click", () => closeDialogWithWarning(cardDialog, cardForm));

@@ -851,6 +851,115 @@ class KanbanStoreProjectCoordinationTest(unittest.TestCase):
         self.assertFalse(third_page["has_more"])
         self.assertIsNone(third_page["next_before_id"])
 
+    def test_events_include_related_cards_even_when_archived(self) -> None:
+        store = self.make_store()
+        self.register_demo_project(store)
+        template = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Recurring source",
+                "description": "Hidden source card.",
+            }
+        )
+        generated = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Generated work",
+                "description": "Visible generated card.",
+            }
+        )
+        store.update_card(template["id"], {"archived": True})
+
+        event = store.create_event(
+            {
+                "board_slug": "demo",
+                "event_type": "workflow.manual",
+                "card_id": generated["id"],
+                "message": generated["title"],
+                "metadata": {
+                    "source_card_id": template["id"],
+                    "source_external_id": template["external_id"],
+                },
+            }
+        )
+        snapshot = store.snapshot("demo")
+        snapshot_event = snapshot["events"][-1]
+
+        self.assertEqual([card["id"] for card in snapshot["cards"]], [generated["id"]])
+        self.assertEqual(
+            [card["external_id"] for card in event["related_cards"]],
+            [generated["external_id"], template["external_id"]],
+        )
+        self.assertEqual(
+            [card["external_id"] for card in snapshot_event["related_cards"]],
+            [generated["external_id"], template["external_id"]],
+        )
+        self.assertFalse(snapshot_event["related_cards"][0]["archived"])
+        self.assertTrue(snapshot_event["related_cards"][1]["archived"])
+        self.assertEqual(snapshot_event["related_cards"][1]["title"], "Recurring source")
+
+    def test_event_pages_include_related_archived_cards(self) -> None:
+        store = self.make_store()
+        self.register_demo_project(store)
+        archived = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Archived source",
+                "description": "Hidden but still related.",
+            }
+        )
+        visible = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Visible target",
+                "description": "Visible related card.",
+            }
+        )
+        store.update_card(archived["id"], {"archived": True})
+        for index in range(12):
+            store.create_event(
+                {
+                    "board_slug": "demo",
+                    "event_type": f"noise.{index:02d}",
+                    "message": "newer event",
+                }
+            )
+        related_event = store.create_event(
+            {
+                "board_slug": "demo",
+                "event_type": "workflow.manual",
+                "card_id": visible["id"],
+                "message": visible["title"],
+                "metadata": {
+                    "source_card_id": archived["id"],
+                    "source_external_id": archived["external_id"],
+                },
+            }
+        )
+        for index in range(12, 24):
+            store.create_event(
+                {
+                    "board_slug": "demo",
+                    "event_type": f"noise.{index:02d}",
+                    "message": "newer event",
+                }
+            )
+
+        snapshot = store.snapshot("demo")
+        page = store.list_events(
+            "demo",
+            limit=10,
+            before_id=snapshot["events_next_before_id"],
+        )
+        page_event = next(event for event in page["events"] if event["id"] == related_event["id"])
+
+        self.assertEqual(
+            [card["external_id"] for card in page_event["related_cards"]],
+            [visible["external_id"], archived["external_id"]],
+        )
+        self.assertFalse(page_event["related_cards"][0]["archived"])
+        self.assertTrue(page_event["related_cards"][1]["archived"])
+
     def test_delegated_agent_feedback_event_becomes_card_comment(self) -> None:
         store = self.make_store()
         self.register_demo_project(store)

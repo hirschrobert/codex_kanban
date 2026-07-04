@@ -95,6 +95,58 @@ textarea {
   gap: 10px;
 }
 
+.event-card-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-card-picker-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-lane);
+  color: var(--text);
+  padding: 10px;
+  text-align: left;
+}
+
+.event-card-picker-option:hover,
+.event-card-picker-option:focus-visible {
+  border-color: var(--teal);
+}
+
+.event-card-picker-number {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.event-card-picker-main {
+  min-width: 0;
+}
+
+.event-card-picker-title,
+.event-card-picker-meta {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.event-card-picker-title {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.event-card-picker-meta {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .settings-limit-panel {
   border: 1px solid var(--line);
   border-radius: 8px;

@@ -52,11 +52,45 @@
   padding-top: 8px;
 }
 
+.activity-item {
+  list-style: none;
+}
+
 .activity-row {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   list-style: none;
+}
+
+button.activity-row {
+  width: 100%;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  background: transparent;
+  color: inherit;
+  cursor: default;
+  font: inherit;
+  text-align: left;
+}
+
+button.activity-row:disabled {
+  opacity: 1;
+}
+
+button.activity-row-linked {
+  cursor: pointer;
+}
+
+.activity-row-linked:hover,
+.activity-row-linked:focus-visible {
+  color: var(--text);
+}
+
+.activity-row-linked:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, 0.28);
+  outline-offset: 2px;
 }
 
 .status-dot {
