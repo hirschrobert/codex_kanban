@@ -35,6 +35,10 @@ Override it with:
 CODEX_KANBAN_DB=/path/to/kanban.sqlite3 python3 -m kanban_server
 ```
 
+On graceful shutdown, including Ctrl+C in a Linux terminal, the server prunes
+event rows older than 48 hours from the SQLite database. Cards and card
+comments are retained.
+
 When running CLI examples from a source checkout, set `KANBAN_REPO` to the
 checkout that contains `kanban_server`. From inside this repository the Git root
 fallback is enough; from another project, set `CODEX_KANBAN_REPO` first:

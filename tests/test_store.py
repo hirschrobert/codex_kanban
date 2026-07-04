@@ -764,6 +764,38 @@ class KanbanStoreTest(unittest.TestCase):
                 }
             )
 
+    def test_prune_events_older_than_keeps_boundary_and_recent_events(self) -> None:
+        store = self.make_store()
+        self.register_demo_project(store)
+        old = store.create_event({"board_slug": "demo", "event_type": "test.old", "message": "old"})
+        boundary = store.create_event(
+            {"board_slug": "demo", "event_type": "test.boundary", "message": "boundary"}
+        )
+        recent = store.create_event(
+            {"board_slug": "demo", "event_type": "test.recent", "message": "recent"}
+        )
+        with store._connect() as conn:
+            conn.execute(
+                "UPDATE events SET created_at = ? WHERE id = ?",
+                ("2026-07-02T11:59:59Z", old["id"]),
+            )
+            conn.execute(
+                "UPDATE events SET created_at = ? WHERE id = ?",
+                ("2026-07-02T12:00:00Z", boundary["id"]),
+            )
+            conn.execute(
+                "UPDATE events SET created_at = ? WHERE id = ?",
+                ("2026-07-04T12:00:00Z", recent["id"]),
+            )
+
+        pruned = store.prune_events_older_than(now=datetime(2026, 7, 4, 12, tzinfo=UTC))
+        event_types = {event["event_type"] for event in store.snapshot("demo")["events"]}
+
+        self.assertEqual(pruned, 1)
+        self.assertNotIn("test.old", event_types)
+        self.assertIn("test.boundary", event_types)
+        self.assertIn("test.recent", event_types)
+
     def test_snapshot_marks_stale_active_agent_and_card(self) -> None:
         store = self.make_store()
         project = store.register_project(

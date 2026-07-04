@@ -105,6 +105,75 @@ class ServerDefaultsTest(unittest.TestCase):
 
         self.assertEqual(stderr.getvalue(), "")
 
+    def test_run_server_prunes_old_events_after_keyboard_interrupt(self) -> None:
+        class DummyThread:
+            def __init__(self, *args: object, **kwargs: object) -> None:
+                del args, kwargs
+                self.joined_timeout: float | None = None
+
+            def start(self) -> None:
+                pass
+
+            def join(self, timeout: float | None = None) -> None:
+                self.joined_timeout = timeout
+
+        fake_servers: list[Any] = []
+
+        class FakeHTTPServer:
+            def __init__(
+                self,
+                server_address: tuple[str, int],
+                handler: type[server.KanbanHandler],
+                *,
+                store: KanbanStore,
+                static_dir: Path,
+                default_board_slug: str | None,
+            ) -> None:
+                del server_address, handler, static_dir, default_board_slug
+                self.store = store
+                self.scheduler_stop = threading.Event()
+                self.closed = False
+                fake_servers.append(self)
+
+            def serve_forever(self) -> None:
+                raise KeyboardInterrupt
+
+            def server_close(self) -> None:
+                self.closed = True
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "kanban.sqlite3"
+            store = KanbanStore(db_path)
+            self.register_demo_project(store)
+            old = store.create_event(
+                {"board_slug": "demo", "event_type": "test.old", "message": "old"}
+            )
+            recent = store.create_event(
+                {"board_slug": "demo", "event_type": "test.recent", "message": "recent"}
+            )
+            with store._connect() as conn:
+                conn.execute(
+                    "UPDATE events SET created_at = ? WHERE id = ?",
+                    ("2000-01-01T00:00:00Z", old["id"]),
+                )
+                conn.execute(
+                    "UPDATE events SET created_at = ? WHERE id = ?",
+                    ("2999-01-01T00:00:00Z", recent["id"]),
+                )
+
+            stdout = io.StringIO()
+            with mock.patch.object(server, "KanbanHTTPServer", FakeHTTPServer):
+                with mock.patch.object(server.threading, "Thread", DummyThread):
+                    with contextlib.redirect_stdout(stdout):
+                        server.run_server("127.0.0.1", 0, db_path)
+
+            event_types = {event["event_type"] for event in store.snapshot("demo")["events"]}
+            self.assertNotIn("test.old", event_types)
+            self.assertIn("test.recent", event_types)
+            self.assertTrue(fake_servers)
+            self.assertTrue(fake_servers[0].closed)
+            self.assertIn("Pruned 1 event(s) older than 48 hours.", stdout.getvalue())
+
     def test_listener_socket_inodes_match_requested_local_address(self) -> None:
         def listener_row(index: int, address: str, inode: str) -> str:
             return (
