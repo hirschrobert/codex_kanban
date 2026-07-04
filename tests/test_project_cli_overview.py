@@ -166,6 +166,111 @@ class ProjectCliOverviewTest(unittest.TestCase):
             [card["id"] for card in reversed(done_cards)],
         )
 
+    def test_snapshot_done_limit_flag_controls_completed_cards(self) -> None:
+        db_path = self.make_db_path()
+        store = KanbanStore(db_path)
+        project_record = store.register_project(
+            {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "card_prefix": "DM",
+                "root_path": "/workspace/demo",
+            }
+        )
+        active = store.create_card(
+            {
+                "board_slug": project_record["board_slug"],
+                "title": "Active card",
+                "description": "Active card.",
+                "status": "in_progress",
+            }
+        )
+        for index in range(4):
+            store.create_card(
+                {
+                    "board_slug": project_record["board_slug"],
+                    "title": f"Done card {index}",
+                    "description": "Done card.",
+                    "status": "done",
+                }
+            )
+
+        full_snapshot = json.loads(
+            self.capture_project_main(
+                [
+                    "snapshot",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                ]
+            )
+        )
+        limited = json.loads(
+            self.capture_project_main(
+                [
+                    "snapshot",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--done-limit",
+                    "2",
+                ]
+            )
+        )
+        without_done = json.loads(
+            self.capture_project_main(
+                [
+                    "snapshot",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--done-limit",
+                    "0",
+                ]
+            )
+        )
+        explicit_all = json.loads(
+            self.capture_project_main(
+                [
+                    "snapshot",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--done-limit",
+                    "-1",
+                ]
+            )
+        )
+
+        full_done_ids = [card["id"] for card in full_snapshot["cards"] if card["status"] == "done"]
+
+        self.assertNotIn("done_limit", full_snapshot)
+        self.assertEqual(len(full_done_ids), 4)
+        self.assertIn(active["id"], [card["id"] for card in limited["cards"]])
+        self.assertEqual(
+            [card["id"] for card in limited["cards"] if card["status"] == "done"],
+            full_done_ids[:2],
+        )
+        self.assertEqual(limited["done_limit"], 2)
+        self.assertEqual(limited["done_card_count"], 4)
+        self.assertEqual(limited["done_cards_hidden_count"], 2)
+        self.assertTrue(limited["done_cards_hidden"])
+        self.assertEqual(
+            [card["id"] for card in without_done["cards"] if card["status"] == "done"],
+            [],
+        )
+        self.assertEqual(without_done["done_cards_hidden_count"], 4)
+        self.assertEqual(
+            [card["id"] for card in explicit_all["cards"] if card["status"] == "done"],
+            full_done_ids,
+        )
+        self.assertFalse(explicit_all["done_cards_hidden"])
+
     def test_overview_can_auto_register_single_repo_with_kanban_instructions(self) -> None:
         db_path = self.make_db_path()
         repo = self.make_git_repo("demo")
