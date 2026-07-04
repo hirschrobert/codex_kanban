@@ -34,9 +34,9 @@ Public commits:
 - `619326a` refactors oversized release-branch frontend and test files into
   responsibility-focused modules so tracked code assets stay below the hard
   1000-line cap.
-- `6c3e236` moves browser app JavaScript assets into a Vue-style
-  `static/app/` folder with kebab-case module names and updates script/test
-  references.
+- `6c3e236` moves browser app JavaScript assets into a Vue-inspired
+  `static/app/` folder with lowercase/kebab-case browser script filenames and
+  updates script/test references.
 - `6f02591` merges the `CK-0358` static app module move into
   `release/0.1.11`.
 
@@ -72,7 +72,7 @@ Changes:
   so every tracked Python, JavaScript, CSS, and HTML code asset stays below the
   hard 1000-line limit.
 - Organized browser app JavaScript under `kanban_server/static/app/` with
-  kebab-case module filenames, including the dashboard entrypoint at
+  lowercase/kebab-case browser script filenames, including the dashboard entrypoint at
   `/static/app/main.js`.
 
 AI disclosure:

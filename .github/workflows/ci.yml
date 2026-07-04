@@ -36,10 +36,11 @@ jobs:
 
       - name: Check JavaScript syntax
         run: |
-          node --check kanban_server/static/app.js
-          node --check kanban_server/static/app_api.js
-          node --check kanban_server/static/app_model.js
-          node --check kanban_server/static/app_state.js
+          node --check kanban_server/static/app/state.js
+          node --check kanban_server/static/app/api.js
+          node --check kanban_server/static/app/model.js
+          node --check kanban_server/static/app/project-settings.js
+          node --check kanban_server/static/app/main.js
 
       - name: Compile Python
         run: uv run python -m compileall -q kanban_server tests
