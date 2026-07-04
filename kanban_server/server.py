@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from .app_metadata import app_metadata as current_app_metadata
 from .project.registration import auto_register_payload_for_cwd
 from .store.core import KanbanStore
-from .store.support import DEFAULT_DB_PATH, DEFAULT_OVERVIEW_DONE_LIMIT
+from .store.support import DEFAULT_DB_PATH, DEFAULT_OVERVIEW_DONE_LIMIT, EVENT_RETENTION_HOURS
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 DEFAULT_HOST = "127.0.0.1"
@@ -846,6 +846,18 @@ def _preferred_board_slug(store: KanbanStore) -> str | None:
     return project["board_slug"] if project else None
 
 
+def _prune_shutdown_events(store: KanbanStore) -> None:
+    try:
+        pruned = store.prune_events_older_than(EVENT_RETENTION_HOURS)
+    except Exception as exc:
+        sys.stderr.write(f"Codex Kanban event prune error during shutdown: {exc}\n")
+        return
+    print(
+        f"Pruned {pruned} event(s) older than {EVENT_RETENTION_HOURS} hours.",
+        flush=True,
+    )
+
+
 def run_server(host: str, port: int, db_path: Path) -> None:
     store = KanbanStore(db_path)
     default_board_slug = _preferred_board_slug(store)
@@ -868,6 +880,7 @@ def run_server(host: str, port: int, db_path: Path) -> None:
     finally:
         server.scheduler_stop.set()
         scheduler.join(timeout=2)
+        _prune_shutdown_events(store)
         server.server_close()
 
 

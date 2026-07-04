@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from .support import (
+    EVENT_RETENTION_HOURS,
     PARTICIPANT_KINDS,
     _json_dumps,
     _normalise_comment_author_name,
@@ -104,6 +106,32 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
         payload = dict(payload)
         payload["id"] = participant_id
         return self.upsert_participant(payload)
+
+    def prune_events_before(self, cutoff: str) -> int:
+        cutoff = str(cutoff or "").strip()
+        if not cutoff:
+            raise ValueError("event prune cutoff is required")
+        with self._lock, self._connect() as conn:
+            cursor = conn.execute("DELETE FROM events WHERE created_at < ?", (cutoff,))
+            return int(cursor.rowcount or 0)
+
+    def prune_events_older_than(
+        self,
+        hours: int = EVENT_RETENTION_HOURS,
+        *,
+        now: datetime | None = None,
+    ) -> int:
+        if hours < 0:
+            raise ValueError("event retention hours must be non-negative")
+        current = now or datetime.now(UTC)
+        if current.tzinfo is None:
+            current = current.replace(tzinfo=UTC)
+        cutoff = (
+            (current.astimezone(UTC) - timedelta(hours=hours))
+            .isoformat(timespec="seconds")
+            .replace("+00:00", "Z")
+        )
+        return self.prune_events_before(cutoff)
 
     def create_event(self, payload: dict[str, Any]) -> dict[str, Any]:
         event_type = str(payload.get("event_type") or "event").strip()
