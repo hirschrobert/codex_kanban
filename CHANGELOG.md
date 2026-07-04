@@ -4,7 +4,8 @@
 
 This release improves Activity handling, event retention, branch guidance,
 code standards, release-branch file-size compliance, static app module
-organization, and concurrent local SQLite coordination.
+organization, snapshot CLI inspection, and concurrent local SQLite
+coordination.
 
 Public commits:
 
@@ -43,6 +44,10 @@ Public commits:
   files and includes dashboard static assets in built wheels.
 - `dc9e8ca` adds a regression test that keeps dashboard script paths and CI
   JavaScript syntax targets aligned.
+- `a3198f7` adds `snapshot --done-limit` to the project CLI so agents can
+  inspect completed-card history without querying SQLite directly.
+- `40ed5e0` merges the `CK-0368` snapshot done-limit CLI fix into
+  `release/0.1.11`.
 
 Release metadata note:
 
@@ -80,6 +85,8 @@ Changes:
   entrypoint at `/static/app/main.js`.
 - Fixed release CI and package metadata so the moved static app scripts are
   checked in CI and included in built wheels.
+- Added `--done-limit` to the `snapshot` project CLI command with
+  overview-compatible `0`, `N`, and `-1` semantics for completed-card history.
 
 AI disclosure:
 
