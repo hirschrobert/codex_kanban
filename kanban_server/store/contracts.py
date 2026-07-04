@@ -103,6 +103,15 @@ class StoreMixinContract:
         definition: str,
     ) -> None: ...
 
+    def _event_page(
+        self,
+        conn: sqlite3.Connection,
+        board_slug: str,
+        *,
+        limit: int = ...,
+        before_id: int | None = None,
+    ) -> dict[str, Any]: ...
+
     def _event_from_row(self, row: sqlite3.Row | None) -> dict[str, Any]: ...
 
     def _first_repeat_run_at(
@@ -265,6 +274,14 @@ class StoreMixinContract:
     ) -> None: ...
 
     def get_card(self, card_id: int) -> dict[str, Any] | None: ...
+
+    def list_events(
+        self,
+        board_slug: str | None = None,
+        *,
+        limit: int = ...,
+        before_id: int | None = None,
+    ) -> dict[str, Any]: ...
 
     def project_for_path(self, path: str | Path) -> dict[str, Any] | None: ...
 

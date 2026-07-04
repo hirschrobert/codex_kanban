@@ -1,8 +1,11 @@
 .side-rail {
   display: flex;
   min-width: 0;
+  min-height: 0;
+  max-height: calc(100vh - 118px);
   flex-direction: column;
   gap: 14px;
+  overflow: hidden;
 }
 
 .panel {
@@ -13,8 +16,11 @@
 }
 
 .activity-panel {
+  display: flex;
   min-height: 280px;
   flex: 1;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .participant-list,
@@ -24,6 +30,7 @@
   gap: 8px;
   margin: 12px 0 0;
   padding: 0;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -33,18 +40,22 @@
 }
 
 .activity-list {
-  max-height: calc(100vh - 260px);
+  flex: 1 1 auto;
+  max-height: none;
 }
 
 .participant-row,
 .activity-row {
+  flex: 0 0 auto;
   min-height: 46px;
   border-top: 1px solid var(--line);
   padding-top: 8px;
 }
 
 .activity-row {
+  display: flex;
   align-items: flex-start;
+  gap: 8px;
   list-style: none;
 }
 
@@ -84,20 +95,26 @@
 
 .participant-main,
 .activity-main {
+  display: flex;
   min-width: 0;
   flex: 1;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .participant-name,
 .activity-message {
+  display: block;
   margin: 0;
   font-size: 13px;
   font-weight: 800;
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
 
 .participant-role,
 .activity-meta {
+  display: block;
   margin: 2px 0 0;
   color: var(--muted);
   font-size: 12px;

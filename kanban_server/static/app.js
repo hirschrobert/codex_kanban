@@ -62,9 +62,42 @@ function setLiveState(label, className) {
   liveStateEl.className = `live-pill ${className || ""}`.trim();
 }
 
+function eventSortValue(event) {
+  return Number(event?.id || 0);
+}
+
+function mergeActivityEvents(...groups) {
+  const byId = new Map();
+  groups.flat().forEach((event) => {
+    if (!event) return;
+    const key = event.id == null ? `${event.created_at || ""}-${event.event_type || ""}` : String(event.id);
+    byId.set(key, event);
+  });
+  return [...byId.values()].sort((left, right) => eventSortValue(left) - eventSortValue(right));
+}
+
+function resetActivityPaging() {
+  state.activityHasMore = false;
+  state.activityLoading = false;
+  state.activityExtended = false;
+}
+
+function prepareActivitySnapshot(snapshot) {
+  const previous = state.snapshot;
+  const previousBoard = previous?.board?.slug || "";
+  const nextBoard = snapshot?.board?.slug || "";
+  const sameBoard = previousBoard && previousBoard === nextBoard;
+  if (state.activityExtended && sameBoard) {
+    snapshot.events = mergeActivityEvents(previous.events || [], snapshot.events || []);
+    return snapshot;
+  }
+  resetActivityPaging();
+  state.activityHasMore = Boolean(snapshot?.events_has_more);
+  return snapshot;
+}
 
 function render(snapshot) {
-  state.snapshot = snapshot;
+  state.snapshot = prepareActivitySnapshot(snapshot);
   const activeBoardSlugs = new Set((snapshot.projects || []).map((project) => project.board_slug));
   if (
     snapshot.board?.slug &&
@@ -315,9 +348,9 @@ function renderParticipants() {
 
 function renderActivity() {
   const events = (state.snapshot?.events || []).slice().reverse();
-  const visibleEvents = events.slice(0, state.activityLimit);
   activityEl.innerHTML = "";
-  visibleEvents.forEach((event) => {
+  activityEl.setAttribute("aria-busy", state.activityLoading ? "true" : "false");
+  events.forEach((event) => {
     const row = document.createElement("li");
     row.className = "activity-row";
     row.innerHTML = `
@@ -802,11 +835,51 @@ function connectEvents() {
   events.addEventListener("error", () => setLiveState("Reconnecting", "offline"));
 }
 
+async function loadMoreActivityEvents() {
+  if (state.activityLoading || !state.activityHasMore || !state.snapshot) {
+    return;
+  }
+  const events = state.snapshot.events || [];
+  const beforeId = events.length ? events[0].id : state.snapshot.events_next_before_id;
+  if (!beforeId) {
+    state.activityHasMore = false;
+    return;
+  }
+  state.activityLoading = true;
+  renderActivity();
+  try {
+    const params = new URLSearchParams();
+    const board = state.snapshot?.board?.slug || state.board;
+    if (board) params.set("board", board);
+    params.set("limit", String(state.activityPageSize));
+    params.set("before_id", String(beforeId));
+    const page = await api(`/api/events?${params.toString()}`);
+    state.snapshot.events = mergeActivityEvents(page.events || [], state.snapshot.events || []);
+    state.snapshot.events_has_more = Boolean(page.has_more);
+    state.snapshot.events_next_before_id = page.next_before_id || null;
+    state.activityHasMore = Boolean(page.has_more);
+    state.activityExtended = true;
+  } catch (error) {
+    console.error(error);
+  } finally {
+    state.activityLoading = false;
+    renderActivity();
+  }
+}
+
+function loadActivityOnScroll(element) {
+  element.addEventListener("scroll", () => {
+    const nearEnd = element.scrollTop + element.clientHeight >= element.scrollHeight - 12;
+    if (!nearEnd) return;
+    loadMoreActivityEvents();
+  });
+}
+
 async function switchProject(event) {
   state.board = event.target.value;
   localStorage.setItem("codex-kanban-board", state.board);
   state.participantLimit = 10;
-  state.activityLimit = 10;
+  resetActivityPaging();
   clearArchiveSelections();
   setLiveState("Switching", "");
   await refresh();
@@ -816,6 +889,7 @@ async function switchProject(event) {
 async function toggleArchived(event) {
   state.showArchived = event.target.checked;
   localStorage.setItem("codex-kanban-show-archived", state.showArchived ? "1" : "0");
+  resetActivityPaging();
   clearArchiveSelections();
   await refresh();
   connectEvents();
@@ -903,12 +977,7 @@ loadMoreOnScroll(
   () => (state.snapshot?.participants || []).length,
   renderParticipants
 );
-loadMoreOnScroll(
-  activityEl,
-  "activityLimit",
-  () => (state.snapshot?.events || []).length,
-  renderActivity
-);
+loadActivityOnScroll(activityEl);
 
 refresh().then(connectEvents).catch((error) => {
   setLiveState("Offline", "offline");
