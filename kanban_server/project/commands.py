@@ -25,6 +25,43 @@ from .registration import auto_register_payload_for_cwd
 CODEX_KANBAN_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+def _limit_snapshot_done_cards(
+    snapshot_payload: dict[str, Any],
+    done_limit: int | None,
+) -> dict[str, Any]:
+    if done_limit is None:
+        return snapshot_payload
+
+    cards = list(snapshot_payload.get("cards") or [])
+    done_card_count = sum(1 for card in cards if card.get("status") == "done")
+    if done_limit < 0:
+        limited_cards = cards
+        hidden_done = 0
+    else:
+        limited_cards = []
+        shown_done = 0
+        hidden_done = 0
+        for card in cards:
+            if card.get("status") != "done":
+                limited_cards.append(card)
+                continue
+            if shown_done < done_limit:
+                limited_cards.append(card)
+                shown_done += 1
+            else:
+                hidden_done += 1
+
+    return {
+        **snapshot_payload,
+        "cards": limited_cards,
+        "card_count": len(limited_cards),
+        "done_limit": done_limit,
+        "done_card_count": done_card_count,
+        "done_cards_hidden_count": hidden_done,
+        "done_cards_hidden": hidden_done > 0,
+    }
+
+
 def register(args: argparse.Namespace) -> int:
     payload = _registration_payload(args)
     if args.server_url:
@@ -67,17 +104,16 @@ def snapshot(args: argparse.Namespace) -> int:
     if args.server_url:
         result = _request_json(args.server_url, path)
         if result is not None:
-            _print_json(result)
+            _print_json(_limit_snapshot_done_cards(result, args.done_limit))
             return 0
 
     store = KanbanStore(args.db)
-    _print_json(
-        store.snapshot(
-            args.board or None,
-            include_archived=args.include_archived,
-            archived_only=args.archived_only,
-        )
+    result = store.snapshot(
+        args.board or None,
+        include_archived=args.include_archived,
+        archived_only=args.archived_only,
     )
+    _print_json(_limit_snapshot_done_cards(result, args.done_limit))
     return 0
 
 

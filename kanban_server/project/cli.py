@@ -102,6 +102,16 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Show only archived cards in the snapshot.",
     )
+    snapshot_parser.add_argument(
+        "--done-limit",
+        type=int,
+        default=None,
+        help=(
+            "Maximum done cards to include in the snapshot. "
+            "Omit to preserve the full snapshot, use 0 to hide done cards, "
+            "or -1 to include all done cards explicitly."
+        ),
+    )
     snapshot_parser.set_defaults(func=snapshot)
 
     overview_parser = subparsers.add_parser(
