@@ -13,23 +13,23 @@ class StaticAssetTest(unittest.TestCase):
     def test_dashboard_scripts_load_in_dependency_order(self) -> None:
         html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
         scripts = [
-            "/static/app_state.js",
-            "/static/app_api.js",
-            "/static/app_model.js",
-            "/static/app_projects.js",
-            "/static/app.js",
+            "/static/app/state.js",
+            "/static/app/api.js",
+            "/static/app/model.js",
+            "/static/app/project-settings.js",
+            "/static/app/main.js",
         ]
         positions = [html.index(f'src="{script}"') for script in scripts]
         self.assertEqual(positions, sorted(positions))
 
     def test_card_notice_renderer_is_defined_with_card_renderer(self) -> None:
-        app = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        app = (STATIC_DIR / "app" / "main.js").read_text(encoding="utf-8")
         self.assertIn("function cardNoticeHtml(card)", app)
         self.assertIn("${cardNoticeHtml(card)}", app)
 
     def test_card_renderer_exposes_owner_and_assignee_labels(self) -> None:
-        app = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-        model = (STATIC_DIR / "app_model.js").read_text(encoding="utf-8")
+        app = (STATIC_DIR / "app" / "main.js").read_text(encoding="utf-8")
+        model = (STATIC_DIR / "app" / "model.js").read_text(encoding="utf-8")
         self.assertIn("function cardOwnerText(card)", model)
         self.assertIn("function cardCreatorText(card)", model)
         self.assertIn("function intakeKindText(card)", model)
@@ -48,7 +48,7 @@ class StaticAssetTest(unittest.TestCase):
 
     def test_card_form_exposes_optional_intake_fields(self) -> None:
         html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-        app = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        app = (STATIC_DIR / "app" / "main.js").read_text(encoding="utf-8")
 
         for field in [
             'name="intake_kind"',
@@ -71,8 +71,8 @@ class StaticAssetTest(unittest.TestCase):
 
     def test_activity_events_open_related_cards(self) -> None:
         html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-        app = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-        model = (STATIC_DIR / "app_model.js").read_text(encoding="utf-8")
+        app = (STATIC_DIR / "app" / "main.js").read_text(encoding="utf-8")
+        model = (STATIC_DIR / "app" / "model.js").read_text(encoding="utf-8")
         sidebar = (STATIC_DIR / "sidebar.css").read_text(encoding="utf-8")
         dialogs = (STATIC_DIR / "dialogs.css").read_text(encoding="utf-8")
 
@@ -89,7 +89,7 @@ class StaticAssetTest(unittest.TestCase):
 
     def test_dashboard_exposes_version_hash_tag(self) -> None:
         html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-        app = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        app = (STATIC_DIR / "app" / "main.js").read_text(encoding="utf-8")
         styles = (STATIC_DIR / "styles.css").read_text(encoding="utf-8")
 
         self.assertIn('id="version-tag"', html)
@@ -108,7 +108,7 @@ class StaticAssetTest(unittest.TestCase):
         self.assertIn(".activity-row {\n  display: flex;", sidebar)
 
     def test_archive_action_continues_after_individual_failure(self) -> None:
-        app = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        app = (STATIC_DIR / "app" / "main.js").read_text(encoding="utf-8")
 
         self.assertIn("const failed = [];", app)
         self.assertIn("failed.push({ card, error });", app)
@@ -132,7 +132,7 @@ const context = vm.createContext({{
 }});
 context.window = context;
 
-for (const file of ["app_state.js", "app_model.js"]) {{
+for (const file of ["app/state.js", "app/model.js"]) {{
   vm.runInContext(fs.readFileSync(`${{staticDir}}/${{file}}`, "utf8"), context, {{
     filename: file
   }});
@@ -234,7 +234,13 @@ const context = vm.createContext({{
 }});
 context.window = context;
 
-for (const file of ["app_state.js", "app_api.js", "app_model.js", "app_projects.js", "app.js"]) {{
+for (const file of [
+  "app/state.js",
+  "app/api.js",
+  "app/model.js",
+  "app/project-settings.js",
+  "app/main.js"
+]) {{
   vm.runInContext(fs.readFileSync(`${{staticDir}}/${{file}}`, "utf8"), context, {{
     filename: file
   }});

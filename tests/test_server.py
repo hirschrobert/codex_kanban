@@ -252,7 +252,7 @@ class ServerDefaultsTest(unittest.TestCase):
             httpd = self.start_server(store)
 
             with urllib.request.urlopen(
-                f"http://127.0.0.1:{httpd.server_address[1]}/static/app.js",
+                f"http://127.0.0.1:{httpd.server_address[1]}/static/app/main.js",
                 timeout=3,
             ) as response:
                 response.read()
