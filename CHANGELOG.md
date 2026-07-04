@@ -3,7 +3,8 @@
 ## 0.1.11 - 2026-07-04
 
 This release improves Activity handling, event retention, branch guidance,
-code standards, and concurrent local SQLite coordination.
+code standards, release-branch file-size compliance, and concurrent local
+SQLite coordination.
 
 Public commits:
 
@@ -30,6 +31,9 @@ Public commits:
   entrypoints, WAL/busy-timeout connection settings, and concurrency tests.
 - `8e365b8` merges the `CK-0354` async SQLite store work into
   `release/0.1.11`.
+- `619326a` refactors oversized release-branch frontend and test files into
+  responsibility-focused modules so tracked code assets stay below the hard
+  1000-line cap.
 
 Release metadata note:
 
@@ -59,6 +63,9 @@ Changes:
   server handlers by removing the process-local store serialization point,
   adding async-capable store wrappers, and strengthening SQLite busy/WAL
   connection settings.
+- Split oversized release-branch frontend and test modules by responsibility
+  so every tracked Python, JavaScript, CSS, and HTML code asset stays below the
+  hard 1000-line limit.
 
 AI disclosure:
 
