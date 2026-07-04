@@ -60,6 +60,15 @@ human developers, the main AI agent, and optional AI subagents.
 - The SQLite database is local coordination state. Do not treat it as production
   application data.
 
+## Code Standards
+
+- Keep files under 600 lines when practical and below 1000 lines always. Split
+  larger responsibilities into clearly named modules by domain responsibility.
+- Avoid names like `mixin` for split-out classes, files, or folders. If
+  composition needs explanation, use a concise docstring.
+- Remove unnecessary code while refactoring, but do not change behavior unless
+  the task requires it.
+
 ## Development Rules
 
 - Prefer the existing standard-library Python implementation unless a task
@@ -67,9 +76,6 @@ human developers, the main AI agent, and optional AI subagents.
 - Follow a model-view-controller structure: keep persistent data and domain
   rules in model/store modules, HTTP/CLI/user action orchestration in controller
   modules, and dashboard rendering/static presentation in view modules.
-- Code files SHOULD stay around 600 lines of code and MUST NOT exceed 1000
-  lines of code. Split files by responsibility before they cross the hard
-  ceiling.
 - Treat Black and Ruff findings as design feedback, not just warnings to
   silence. Prefer cohesive packages, single-responsibility modules, shared
   helpers, and explicit public APIs over duplicated code, compatibility glue, or
