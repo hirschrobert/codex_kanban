@@ -431,6 +431,15 @@ class KanbanHandler(BaseHTTPRequestHandler):
                     archived_only=archived_only,
                 )
                 return
+            parts = parsed.path.strip("/").split("/")
+            if len(parts) == 3 and parts[:2] == ["api", "cards"]:
+                card_id = int(parts[2])
+                card = self.kanban_server.store.get_card(card_id)
+                if not card:
+                    self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                self._send_json(card)
+                return
             self._serve_static(parsed.path)
         except Exception as exc:
             self._send_error(exc)

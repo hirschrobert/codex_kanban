@@ -129,6 +129,7 @@ class CardStoreMixin(_StoreMixinContract):
                     (board_slug, event_limit),
                 )
             ]
+            self._attach_event_related_cards(conn, events_desc, board_slug=board_slug)
             return {
                 "server_time": server_time,
                 "board": dict(board) if board else None,

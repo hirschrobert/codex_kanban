@@ -68,6 +68,24 @@ class StaticAssetTest(unittest.TestCase):
             app,
         )
 
+    def test_activity_events_open_related_cards(self) -> None:
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        app = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        model = (STATIC_DIR / "app_model.js").read_text(encoding="utf-8")
+        sidebar = (STATIC_DIR / "sidebar.css").read_text(encoding="utf-8")
+        dialogs = (STATIC_DIR / "dialogs.css").read_text(encoding="utf-8")
+
+        self.assertIn('id="event-card-picker-dialog"', html)
+        self.assertIn('id="event-card-picker-list"', html)
+        self.assertIn("function relatedCardsForEvent(event)", model)
+        self.assertIn("function relatedCardSummary(cards)", model)
+        self.assertIn("function openEventCards(event)", app)
+        self.assertIn('row.addEventListener("click", () => openEventCards(event));', app)
+        self.assertIn("/api/cards/${encodeURIComponent(reference.id)}", app)
+        self.assertIn('class="chip archived-chip">archived</span>', app)
+        self.assertIn("button.activity-row-linked", sidebar)
+        self.assertIn(".event-card-picker-option", dialogs)
+
     def test_dashboard_exposes_version_hash_tag(self) -> None:
         html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
         app = (STATIC_DIR / "app.js").read_text(encoding="utf-8")

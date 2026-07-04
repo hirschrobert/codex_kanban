@@ -173,7 +173,9 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
             if cursor.lastrowid is None:
                 raise RuntimeError("event insert did not return an id")
             row = self._one(conn, "SELECT * FROM events WHERE id = ?", (int(cursor.lastrowid),))
-            return self._event_from_row(row)
+            event = self._event_from_row(row)
+            self._attach_event_related_cards(conn, [event], board_slug=board_slug)
+            return event
 
     def _agent_feedback_comment_id(
         self,

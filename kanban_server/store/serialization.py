@@ -204,6 +204,7 @@ class SerializationCoordinationMixin(_StoreMixinContract):
             return {}
         event = dict(row)
         event["metadata"] = _json_loads(event.get("metadata"), {})
+        event["related_cards"] = []
         return event
 
     def _card_comment_from_row(self, row: sqlite3.Row | None) -> dict[str, Any]:
