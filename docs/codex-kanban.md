@@ -158,12 +158,21 @@ server creates or reuses one ready workflow card and advances the template to
 the next future run. Use the card's `Run Now` button when a human intentionally
 wants an immediate workflow card.
 
-Card notes capture human or agent context that future work should consider.
-Notes are scoped to the card's board and appear in the card dialog with writer
-name, writer kind, date, and time. Agent `finished`, `feedback`, and `handoff`
-events, plus hook-style subagent `stopped`, `feedback`, and `handoff` events,
-are mirrored into notes when they include a card and message so card owners do
-not need to scan the event stream for delegated feedback.
+Card notes capture human or agent context that future work should consider but
+that is not a separate task. Use them for findings, decisions, blockers,
+readiness context, and contributor results. Notes are scoped to the card's board
+and appear in the card dialog with writer name, writer kind, date, and time.
+Agent `finished`, `feedback`, and `handoff` events, plus hook-style subagent
+`stopped`, `feedback`, and `handoff` events, are mirrored into notes when they
+include a card and message so card owners do not need to scan the event stream
+for delegated feedback.
+
+For parent/child coordination, child cards hold execution state: assignee,
+branch/worktree, files changed, checks, blockers, and handoff SHA. The parent
+coordination card should hold the durable topic context. When a subagent or
+other contributor finishes material work, add a concise note to the parent card
+with its result, findings, decisions, blockers, and next steps. This keeps the
+parent card useful as the place where future agents resume the topic.
 
 Archived cards are hidden from the normal board. Use the top-bar `Archived`
 toggle to switch to archived cards only; non-archived cards are hidden in that
@@ -430,6 +439,22 @@ commits. Do not hand off unstaged implementation files. After a human-approved
 merge updates the release branch, refresh every other active feature/fix branch
 from that release branch before more edits and record the new SHA/checks.
 
+Add a durable note to a card:
+
+```bash
+PYTHONPATH="$KANBAN_REPO" \
+python3 -m kanban_server.project card-comment 1 \
+  --server-url http://127.0.0.1:8766 \
+  --board my-project \
+  --participant-id my-project-project-reviewer \
+  --body "Reviewer result: no blocking findings; run contract tests before merge."
+```
+
+Use `card-comment` when the information should stay with the card but should
+not become a separate task. If a delegated agent finishes work on a child card,
+write the result summary on the parent coordination card and keep the child
+card's move/check/handoff fields focused on execution details.
+
 Link dependency cards from the CLI:
 
 ```bash
@@ -642,6 +667,9 @@ Participating AI agents should:
   A reviewer recommendation to merge is not itself merge approval;
 - treat dependency links as release guards: a parent depends on its child cards,
   and the parent may advance only after its children are done;
+- write durable findings, decisions, blockers, and contributor results as card
+  comments. When a delegated contributor finishes, summarize its result on the
+  parent coordination card so the parent keeps the topic context;
 - move or report the card when they start, block, hand off, or finish;
 - include card ID, branch, before/after target SHAs, changed files, checks,
   failures, changed assumptions, and follow-up cards in handoffs;
