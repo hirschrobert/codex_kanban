@@ -5,11 +5,17 @@ import io
 import json
 import subprocess
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
-from kanban_server import project
+from kanban_server import project, server
 from kanban_server.store import KanbanStore
+
+
+class QuietKanbanHandler(server.KanbanHandler):
+    def log_message(self, format: str, *args: object) -> None:
+        del format, args
 
 
 class ProjectCliTest(unittest.TestCase):
@@ -37,6 +43,19 @@ class ProjectCliTest(unittest.TestCase):
         )
         script.chmod(0o755)
         return script
+
+    def start_server(self, store: KanbanStore) -> server.KanbanHTTPServer:
+        httpd = server.KanbanHTTPServer(
+            ("127.0.0.1", 0),
+            QuietKanbanHandler,
+            store=store,
+            static_dir=server.STATIC_DIR,
+        )
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(httpd.server_close)
+        self.addCleanup(httpd.shutdown)
+        return httpd
 
     def capture_project_main(self, args: list[str]) -> str:
         output = io.StringIO()
@@ -72,6 +91,8 @@ class ProjectCliTest(unittest.TestCase):
         self.assertIn("all available board-scoped profiles", output)
         self.assertIn("project-local profiles", output)
         self.assertIn("why delegation was used or skipped", output)
+        self.assertIn("parent coordination card", output)
+        self.assertIn("findings, decisions, blockers", output)
         self.assertIn("disallows spawning from standing project", output)
         self.assertNotIn("include an explicit user request", output)
         self.assertIn("Split multi-intent human requests before implementation", output)
@@ -273,6 +294,248 @@ class ProjectCliTest(unittest.TestCase):
                 },
             ],
         )
+
+    def test_card_comment_defaults_to_ai_agent_manager(self) -> None:
+        db_path = self.make_db_path()
+        with contextlib.redirect_stdout(io.StringIO()):
+            project.main(
+                [
+                    "card-create",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--title",
+                    "Coordinate topic",
+                    "--description",
+                    "Keep parent context together.",
+                ]
+            )
+
+        output = self.capture_project_main(
+            [
+                "card-comment",
+                "--db",
+                str(db_path),
+                "--board",
+                "demo",
+                "1",
+                "--body",
+                "Main agent summary for the parent card.",
+            ]
+        )
+        comment = json.loads(output)
+        store = KanbanStore(db_path)
+        card = store.get_card(1)
+        assert card is not None
+
+        self.assertEqual(comment["participant_id"], "demo-ai-agent-manager")
+        self.assertEqual(comment["author_name"], "AI Agent Manager")
+        self.assertEqual(comment["author_kind"], "agent")
+        self.assertEqual(card["comment_count"], 1)
+        self.assertEqual(card["comments"][0]["body"], "Main agent summary for the parent card.")
+        events = store.snapshot("demo")["events"]
+        self.assertEqual(events[-1]["event_type"], "card.commented")
+        self.assertEqual(events[-1]["metadata"]["comment_id"], comment["id"])
+
+    def test_card_comment_records_board_scoped_subagent_note(self) -> None:
+        db_path = self.make_db_path()
+        with contextlib.redirect_stdout(io.StringIO()):
+            project.main(
+                [
+                    "card-create",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--title",
+                    "Coordinate topic",
+                    "--description",
+                    "Keep delegated results on the parent card.",
+                ]
+            )
+            project.main(
+                [
+                    "participant-upsert",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--id",
+                    "demo-project-reviewer",
+                    "--display-name",
+                    "project_reviewer",
+                    "--kind",
+                    "agent",
+                    "--status",
+                    "idle",
+                ]
+            )
+
+        output = self.capture_project_main(
+            [
+                "card-comment",
+                "--db",
+                str(db_path),
+                "--board",
+                "demo",
+                "--participant-id",
+                "demo-project-reviewer",
+                "1",
+                "--comment",
+                "Reviewer result: no blocking findings.",
+            ]
+        )
+        comment = json.loads(output)
+        store = KanbanStore(db_path)
+        card = store.get_card(1)
+        assert card is not None
+
+        self.assertEqual(comment["participant_id"], "demo-project-reviewer")
+        self.assertEqual(comment["author_name"], "project_reviewer")
+        self.assertEqual(comment["author_kind"], "agent")
+        self.assertEqual(card["comments"][0]["body"], "Reviewer result: no blocking findings.")
+
+    def test_card_comment_posts_to_server_with_default_actor(self) -> None:
+        db_path = self.make_db_path()
+        store = KanbanStore(db_path)
+        card = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Coordinate topic",
+                "description": "Server path should record parent notes.",
+            }
+        )
+        httpd = self.start_server(store)
+        server_url = f"http://127.0.0.1:{httpd.server_address[1]}"
+
+        output = self.capture_project_main(
+            [
+                "card-comment",
+                "--server-url",
+                server_url,
+                "--board",
+                "demo",
+                str(card["id"]),
+                "--body",
+                "Server-mode parent note.",
+            ]
+        )
+        comment = json.loads(output)
+        updated = store.get_card(card["id"])
+        assert updated is not None
+
+        self.assertEqual(comment["participant_id"], "demo-ai-agent-manager")
+        self.assertEqual(comment["body"], "Server-mode parent note.")
+        self.assertEqual(updated["comment_count"], 1)
+        self.assertEqual(updated["comments"][0]["author_name"], "AI Agent Manager")
+
+    def test_card_comment_rejects_unknown_participant(self) -> None:
+        db_path = self.make_db_path()
+        store = KanbanStore(db_path)
+        card = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Coordinate topic",
+                "description": "Reject unknown note writers.",
+            }
+        )
+
+        with self.assertRaises(SystemExit) as raised:
+            project.main(
+                [
+                    "card-comment",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--participant-id",
+                    "demo-project-reviewer",
+                    str(card["id"]),
+                    "--body",
+                    "Unknown reviewer result.",
+                ]
+            )
+
+        self.assertIn("unknown participant_id", str(raised.exception))
+
+    def test_card_comment_rejects_wrong_board_participant(self) -> None:
+        db_path = self.make_db_path()
+        store = KanbanStore(db_path)
+        card = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Coordinate topic",
+                "description": "Reject cross-board note writers.",
+            }
+        )
+        store.upsert_participant(
+            {
+                "id": "other-project-reviewer",
+                "display_name": "project_reviewer",
+                "kind": "agent",
+                "status": "idle",
+                "board_slug": "other",
+            }
+        )
+
+        with self.assertRaises(SystemExit) as raised:
+            project.main(
+                [
+                    "card-comment",
+                    "--db",
+                    str(db_path),
+                    "--board",
+                    "demo",
+                    "--participant-id",
+                    "other-project-reviewer",
+                    str(card["id"]),
+                    "--body",
+                    "Cross-board reviewer result.",
+                ]
+            )
+
+        self.assertIn("cannot comment on card", str(raised.exception))
+
+    def test_card_comment_actor_alias_does_not_create_default_actor(self) -> None:
+        db_path = self.make_db_path()
+        store = KanbanStore(db_path)
+        card = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Coordinate topic",
+                "description": "Actor alias should be explicit.",
+            }
+        )
+        store.upsert_participant(
+            {
+                "id": "demo-project-reviewer",
+                "display_name": "project_reviewer",
+                "kind": "agent",
+                "status": "idle",
+                "board_slug": "demo",
+            }
+        )
+
+        output = self.capture_project_main(
+            [
+                "card-comment",
+                "--db",
+                str(db_path),
+                "--board",
+                "demo",
+                "--actor-id",
+                "demo-project-reviewer",
+                str(card["id"]),
+                "--body",
+                "Actor alias reviewer result.",
+            ]
+        )
+        comment = json.loads(output)
+        participant_ids = {item["id"] for item in store.snapshot("demo")["participants"]}
+
+        self.assertEqual(comment["participant_id"], "demo-project-reviewer")
+        self.assertNotIn("demo-ai-agent-manager", participant_ids)
 
     def test_card_create_reports_bad_assignee_without_traceback(self) -> None:
         db_path = self.make_db_path()

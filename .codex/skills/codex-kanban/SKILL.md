@@ -71,9 +71,10 @@ For non-trivial card descriptions, use one clean rationale block:
 - `If this is not fixed:`;
 - `Acceptance criteria:`.
 
-Do not duplicate those headings. If later information is feedback or readiness
-context, add a card comment. If it is separate work, create a child card or a
-new sibling card before assigning implementation.
+Do not duplicate those headings. If later information is feedback, findings,
+decisions, blockers, readiness context, or a finished contributor summary, add
+a card comment. If it is separate work, create a child card or a new sibling
+card before assigning implementation.
 
 ## Useful CLI Shapes
 
@@ -132,6 +133,19 @@ PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project card-move <numeric-ca
 
 Use `--clear-blocker` to remove a resolved blocker. If an assignee is missing,
 register it first with `participant-upsert`; do not invent participant IDs.
+
+```bash
+PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project card-comment <numeric-card-id> \
+  --server-url "${CODEX_KANBAN_URL:-http://127.0.0.1:8766}" \
+  --board <board> \
+  --participant-id <board-agent-id> \
+  --body "<durable note, finding, blocker, or contributor result>"
+```
+
+Use `card-comment` for durable context that future work should read but that is
+not a new task by itself. For delegated work, comment on the parent coordination
+card with the subagent's result, findings, decisions, blockers, and next steps.
+Also update the child card status/checks/handoff fields for execution state.
 
 Agent event ingestion:
 
@@ -201,6 +215,10 @@ Before delegating:
   parallel;
 - record target repo, target branch, starting SHA, worktree path, checks, and
   acceptance criteria.
+- when a delegated contributor finishes, add a concise comment to the parent
+  coordination card that summarizes the result, findings, decisions, blockers,
+  and next steps; keep child-card comments/status for child-local execution
+  details.
 
 Treat different user requests, write scopes, and agents as separate
 contributors. Do not bundle unrelated feature/fix work into one implementation
@@ -267,6 +285,8 @@ Cards should accumulate only the fields needed for handoff:
 - files changed, checks run, failures, assumptions, blockers;
 - comments for human/agent feedback and follow-up child cards for separate
   work.
+- parent-card comments for delegated contributor results that should remain
+  with the topic context.
 
 A parent depends on its children and cannot advance into active/review/done
 until child dependencies are done.

@@ -93,6 +93,18 @@ class HookAutoRegistrationTest(unittest.TestCase):
         self.assertEqual(participant_id, "demo-domain-accountant")
         self.assertEqual(raw_agent_id, "subagent-456")
 
+    def test_subagent_context_tells_agents_to_comment_on_parent_card(self) -> None:
+        message = hook._context_message(
+            {
+                "instruction_paths": ["/workspace/demo/AGENTS.md"],
+                "agent_profiles": ["project_reviewer"],
+            },
+            "demo",
+        )
+
+        self.assertIn("parent coordination card", message)
+        self.assertIn("findings, decisions, blockers, and next steps", message)
+
 
 if __name__ == "__main__":
     unittest.main()

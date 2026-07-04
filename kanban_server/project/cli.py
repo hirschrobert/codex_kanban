@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ..store.support import DEFAULT_DB_PATH, DEFAULT_OVERVIEW_DONE_LIMIT
 from .commands import (
+    card_comment,
     card_create,
     card_move,
     due_run,
@@ -183,6 +184,24 @@ def main(argv: list[str] | None = None) -> int:
         help="Clear an existing blocker reason while moving or handing off a card.",
     )
     card_move_parser.set_defaults(func=card_move)
+
+    card_comment_parser = subparsers.add_parser(
+        "card-comment", help="Add a durable note/comment to a card."
+    )
+    _add_connection_arguments(card_comment_parser)
+    card_comment_parser.add_argument("card_id", type=int)
+    card_comment_parser.add_argument("--board")
+    card_comment_parser.add_argument("--participant-id")
+    card_comment_parser.add_argument("--actor-id")
+    card_comment_parser.add_argument("--author-name")
+    card_comment_parser.add_argument(
+        "--author-kind",
+        choices=("agent", "human", "system"),
+    )
+    comment_body = card_comment_parser.add_mutually_exclusive_group(required=True)
+    comment_body.add_argument("--body")
+    comment_body.add_argument("--comment", dest="body")
+    card_comment_parser.set_defaults(func=card_comment)
 
     workflow_parser = subparsers.add_parser(
         "workflow-start",

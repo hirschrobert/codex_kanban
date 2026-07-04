@@ -41,6 +41,11 @@ human developers, the main AI agent, and optional AI subagents.
   final review/approval. After any branch lands on the release branch, all other
   active feature/fix branches must rebase or otherwise refresh from that release
   branch and record updated SHAs/checks before continuing.
+- When a subagent or other contributor finishes material work, write its result
+  as a concise comment on the parent coordination card. Child cards hold
+  execution status, branch/check details, and local handoff facts; parent-card
+  comments hold the durable findings, decisions, blockers, and next steps for
+  continuing the topic.
 - For ecosystem release/deploy work, record affected apps, repos, worktrees,
   and deployment dispositions before marking production deployment complete.
 - Keep this app abstract. Do not hardcode project-specific domains, agent names,
