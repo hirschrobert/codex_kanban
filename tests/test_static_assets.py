@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import unittest
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
 STATIC_DIR = Path(__file__).resolve().parents[1] / "kanban_server" / "static"
 
 
@@ -21,6 +23,27 @@ class StaticAssetTest(unittest.TestCase):
         ]
         positions = [html.index(f'src="{script}"') for script in scripts]
         self.assertEqual(positions, sorted(positions))
+
+    def test_ci_javascript_checks_match_dashboard_scripts(self) -> None:
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        script_paths = re.findall(r'<script src="(/static/[^"]+\.js)"></script>', html)
+        expected_targets = [
+            f"kanban_server/static/{script_path.removeprefix('/static/')}"
+            for script_path in script_paths
+        ]
+        ci_targets = re.findall(r"node --check (kanban_server/static/\S+\.js)", ci)
+
+        self.assertEqual(ci_targets, expected_targets)
+        for legacy_name in [
+            "app.js",
+            "app_api.js",
+            "app_model.js",
+            "app_projects.js",
+            "app_state.js",
+        ]:
+            self.assertFalse((STATIC_DIR / legacy_name).exists(), legacy_name)
+            self.assertNotIn(f"kanban_server/static/{legacy_name}", ci)
 
     def test_card_notice_renderer_is_defined_with_card_renderer(self) -> None:
         app = (STATIC_DIR / "app" / "main.js").read_text(encoding="utf-8")
