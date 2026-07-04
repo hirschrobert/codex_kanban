@@ -124,11 +124,11 @@ window.Kanban = window.Kanban || {};
         "Target branch is empty. Use or create the current release branch; workflow automation must not target main or master."
       );
     }
-  if (normalText(card.feature_branch) && !normalText(card.worktree_path)) {
-    warnings.push(
-      "Feature branch has no worktree path. Add the worktree path before handing off isolated branch work."
-    );
-  }
+    if (normalText(card.feature_branch) && !normalText(card.worktree_path)) {
+      warnings.push(
+        "Feature branch has no worktree path. Add the worktree path before handing off isolated branch work."
+      );
+    }
     return warnings;
   }
 
@@ -141,22 +141,27 @@ window.Kanban = window.Kanban || {};
     const rightRepo = normalPath(right.target_repo);
     const leftBranch = normalText(left.target_branch);
     const rightBranch = normalText(right.target_branch);
+    const leftFeature = normalText(left.feature_branch);
+    const rightFeature = normalText(right.feature_branch);
+    const leftWorktree = normalPath(left.worktree_path);
+    const rightWorktree = normalPath(right.worktree_path);
     if (leftRepo && leftRepo === rightRepo) {
-      if (leftBranch && rightBranch && leftBranch === rightBranch) {
-        reasons.push(`same target repo and branch: ${leftBranch}`);
-      } else if (!leftBranch || !rightBranch) {
+      if (!leftBranch || !rightBranch) {
         reasons.push("same target repo with a missing target branch");
+      } else if (
+        leftBranch === rightBranch &&
+        !(leftFeature && rightFeature && leftFeature !== rightFeature)
+      ) {
+        reasons.push(
+          `same target repo and branch without distinct feature branches: ${leftBranch}`
+        );
       }
     }
 
-    const leftFeature = normalText(left.feature_branch);
-    const rightFeature = normalText(right.feature_branch);
     if (leftFeature && leftFeature === rightFeature) {
       reasons.push(`same feature branch: ${leftFeature}`);
     }
 
-    const leftWorktree = normalPath(left.worktree_path);
-    const rightWorktree = normalPath(right.worktree_path);
     if (leftWorktree && leftWorktree === rightWorktree) {
       reasons.push(`same worktree path: ${leftWorktree}`);
     }
