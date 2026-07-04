@@ -452,19 +452,24 @@ class SerializationCoordinationMixin(_StoreMixinContract):
         right_repo = self._normalised_path(right.get("target_repo"))
         left_branch = self._clean_text(left.get("target_branch"))
         right_branch = self._clean_text(right.get("target_branch"))
-        if left_repo and left_repo == right_repo:
-            if left_branch and right_branch and left_branch == right_branch:
-                reasons.append(f"same target repo and branch: {left_branch}")
-            elif not left_branch or not right_branch:
-                reasons.append("same target repo with a missing target branch")
-
         left_feature = self._clean_text(left.get("feature_branch"))
         right_feature = self._clean_text(right.get("feature_branch"))
+        left_worktree = self._normalised_path(left.get("worktree_path"))
+        right_worktree = self._normalised_path(right.get("worktree_path"))
+        if left_repo and left_repo == right_repo:
+            if not left_branch or not right_branch:
+                reasons.append("same target repo with a missing target branch")
+            elif left_branch == right_branch and not (
+                left_feature and right_feature and left_feature != right_feature
+            ):
+                reasons.append(
+                    "same target repo and branch without distinct feature "
+                    f"branches: {left_branch}"
+                )
+
         if left_feature and left_feature == right_feature:
             reasons.append(f"same feature branch: {left_feature}")
 
-        left_worktree = self._normalised_path(left.get("worktree_path"))
-        right_worktree = self._normalised_path(right.get("worktree_path"))
         if left_worktree and left_worktree == right_worktree:
             reasons.append(f"same worktree path: {left_worktree}")
 

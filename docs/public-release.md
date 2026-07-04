@@ -18,8 +18,11 @@ card: included/excluded cards and branches, affected apps/repos/worktrees, and
 deployment dispositions for anything production-facing.
 
 Push only explicit release refs, the approved `main` release-merge
-fast-forward ref, and release tags. Feature, fix, and release metadata commits
-stay on `release/<version>`. Create the visible no-fast-forward release merge
+fast-forward ref, and release tags. Feature and fix work starts on
+card-specific branches and merges into `release/<version>` only after human
+final review; release metadata commits stay on `release/<version>`. After each
+approved branch lands, refresh the remaining active feature/fix branches from
+the updated release branch. Create the visible no-fast-forward release merge
 commit locally before the first public push for that release, then push that
 merge commit to the release branch once. CI should run once on the exact merge
 SHA that will later fast-forward `main`:

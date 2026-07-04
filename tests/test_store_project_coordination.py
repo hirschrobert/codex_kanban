@@ -472,9 +472,98 @@ class KanbanStoreProjectCoordinationTest(unittest.TestCase):
         first_reasons = cards[first["id"]]["conflicts"][0]["reasons"]
         second_conflict = cards[second["id"]]["conflicts"][0]
 
-        self.assertIn("same target repo and branch: release/1.2", first_reasons)
+        self.assertIn(
+            "same target repo and branch without distinct feature branches: release/1.2",
+            first_reasons,
+        )
         self.assertIn("same declared files: app/workflow.py", first_reasons)
         self.assertEqual(second_conflict["external_id"], first["external_id"])
+
+    def test_snapshot_conflicts_same_release_branch_without_feature_branches(self) -> None:
+        store = self.make_store()
+        project = store.register_project(
+            {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "card_prefix": "DM",
+                "root_path": "/tmp/demo",
+            }
+        )
+        first = store.create_card(
+            {
+                "board_slug": project["board_slug"],
+                "title": "First implementation",
+                "description": "Uses a worktree but no feature branch.",
+                "status": "in_progress",
+                "target_repo": "/tmp/demo",
+                "target_branch": "release/1.2",
+                "worktree_path": "/workspace/worktrees/demo-a",
+                "files_changed": ["app/first.py"],
+            }
+        )
+        store.create_card(
+            {
+                "board_slug": project["board_slug"],
+                "title": "Second implementation",
+                "description": "Uses another worktree but no feature branch.",
+                "status": "in_progress",
+                "target_repo": "/tmp/demo",
+                "target_branch": "release/1.2",
+                "worktree_path": "/workspace/worktrees/demo-b",
+                "files_changed": ["app/second.py"],
+            }
+        )
+
+        cards = {card["id"]: card for card in store.snapshot("demo")["cards"]}
+        first_reasons = cards[first["id"]]["conflicts"][0]["reasons"]
+
+        self.assertIn(
+            "same target repo and branch without distinct feature branches: release/1.2",
+            first_reasons,
+        )
+
+    def test_snapshot_allows_same_release_branch_with_distinct_feature_branches(self) -> None:
+        store = self.make_store()
+        project = store.register_project(
+            {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "card_prefix": "DM",
+                "root_path": "/tmp/demo",
+            }
+        )
+        store.create_card(
+            {
+                "board_slug": project["board_slug"],
+                "title": "First implementation",
+                "description": "Touches one area.",
+                "status": "in_progress",
+                "target_repo": "/tmp/demo",
+                "target_branch": "release/1.2",
+                "feature_branch": "feature/DM-0001-first",
+                "worktree_path": "/workspace/worktrees/demo-a",
+                "files_changed": ["app/first.py"],
+            }
+        )
+        store.create_card(
+            {
+                "board_slug": project["board_slug"],
+                "title": "Second implementation",
+                "description": "Touches another area.",
+                "status": "in_progress",
+                "target_repo": "/tmp/demo",
+                "target_branch": "release/1.2",
+                "feature_branch": "feature/DM-0002-second",
+                "worktree_path": "/workspace/worktrees/demo-b",
+                "files_changed": ["app/second.py"],
+            }
+        )
+
+        cards = store.snapshot("demo")["cards"]
+
+        self.assertTrue(all(not card["conflicts"] for card in cards))
 
     def test_snapshot_warns_when_active_card_has_no_target_branch(self) -> None:
         store = self.make_store()
