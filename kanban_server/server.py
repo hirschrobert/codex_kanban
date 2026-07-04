@@ -852,11 +852,10 @@ def _prune_shutdown_events(store: KanbanStore) -> None:
     except Exception as exc:
         sys.stderr.write(f"Codex Kanban event prune error during shutdown: {exc}\n")
         return
-    if pruned:
-        print(
-            f"Pruned {pruned} event(s) older than {EVENT_RETENTION_HOURS} hours.",
-            flush=True,
-        )
+    print(
+        f"Pruned {pruned} event(s) older than {EVENT_RETENTION_HOURS} hours.",
+        flush=True,
+    )
 
 
 def run_server(host: str, port: int, db_path: Path) -> None:

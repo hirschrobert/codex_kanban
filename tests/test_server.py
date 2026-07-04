@@ -174,6 +174,21 @@ class ServerDefaultsTest(unittest.TestCase):
             self.assertTrue(fake_servers[0].closed)
             self.assertIn("Pruned 1 event(s) older than 48 hours.", stdout.getvalue())
 
+    def test_shutdown_event_prune_prints_zero_count(self) -> None:
+        class EmptyPruneStore:
+            def prune_events_older_than(self, hours: int) -> int:
+                self.hours = hours
+                return 0
+
+        store = EmptyPruneStore()
+        stdout = io.StringIO()
+
+        with contextlib.redirect_stdout(stdout):
+            server._prune_shutdown_events(store)  # type: ignore[arg-type]
+
+        self.assertEqual(store.hours, server.EVENT_RETENTION_HOURS)
+        self.assertIn("Pruned 0 event(s) older than 48 hours.", stdout.getvalue())
+
     def test_listener_socket_inodes_match_requested_local_address(self) -> None:
         def listener_row(index: int, address: str, inode: str) -> str:
             return (
