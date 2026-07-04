@@ -78,6 +78,16 @@ class StaticAssetTest(unittest.TestCase):
         self.assertIn("renderVersionTag(snapshot.app);", app)
         self.assertIn(".version-pill", styles)
 
+    def test_activity_panel_uses_internal_scroll_without_row_shrink(self) -> None:
+        sidebar = (STATIC_DIR / "sidebar.css").read_text(encoding="utf-8")
+
+        self.assertIn("max-height: calc(100vh - 118px);", sidebar)
+        self.assertIn("overflow: hidden;", sidebar)
+        self.assertIn("flex: 1 1 auto;", sidebar)
+        self.assertIn("max-height: none;", sidebar)
+        self.assertIn("flex: 0 0 auto;", sidebar)
+        self.assertIn(".activity-row {\n  display: flex;", sidebar)
+
     def test_archive_action_continues_after_individual_failure(self) -> None:
         app = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
 
