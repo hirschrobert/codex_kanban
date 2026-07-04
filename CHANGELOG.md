@@ -39,6 +39,10 @@ Public commits:
   updates script/test references.
 - `6f02591` merges the `CK-0358` static app module move into
   `release/0.1.11`.
+- `bd92d1a` fixes release CI JavaScript syntax paths for the moved static app
+  files and includes dashboard static assets in built wheels.
+- `dc9e8ca` adds a regression test that keeps dashboard script paths and CI
+  JavaScript syntax targets aligned.
 
 Release metadata note:
 
@@ -72,8 +76,10 @@ Changes:
   so every tracked Python, JavaScript, CSS, and HTML code asset stays below the
   hard 1000-line limit.
 - Organized browser app JavaScript under `kanban_server/static/app/` with
-  lowercase/kebab-case browser script filenames, including the dashboard entrypoint at
-  `/static/app/main.js`.
+  lowercase/kebab-case browser script filenames, including the dashboard
+  entrypoint at `/static/app/main.js`.
+- Fixed release CI and package metadata so the moved static app scripts are
+  checked in CI and included in built wheels.
 
 AI disclosure:
 
