@@ -83,6 +83,8 @@ class StaticAssetTest(unittest.TestCase):
         sidebar = (STATIC_DIR / "sidebar.css").read_text(encoding="utf-8")
 
         self.assertIn("function agentInstanceSummary(instance)", model)
+        self.assertIn("normalText(instance?.agent_type)", model)
+        self.assertIn("Focused:", app)
         self.assertIn("participant.instances", app)
         self.assertIn('class="participant-instance"', app)
         self.assertIn("event.metadata?.model", app)

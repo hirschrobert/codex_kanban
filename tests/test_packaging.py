@@ -41,7 +41,7 @@ class PackagingTest(unittest.TestCase):
         self.assertIn("supported lighter model", compact_skill)
         self.assertIn("actual runtime model", compact_skill)
 
-    def test_skill_requires_exact_custom_agent_selection(self) -> None:
+    def test_skill_keeps_profiles_optional_and_exact_when_selected(self) -> None:
         skill = (ROOT / ".codex" / "skills" / "codex-kanban" / "SKILL.md").read_text(
             encoding="utf-8"
         )
@@ -51,7 +51,8 @@ class PackagingTest(unittest.TestCase):
         self.assertIn("exact Codex custom-agent type", plain_skill)
         self.assertIn("task_name does not select that agent", plain_skill)
         self.assertIn("never present a default agent as a named specialist", plain_skill)
-        self.assertIn("cannot select the exact custom-agent type", plain_skill)
+        self.assertIn("optional catalog", plain_skill)
+        self.assertIn("does not force delegation", plain_skill)
 
     def test_skill_keeps_worktrees_on_origin_board_and_cleans_them(self) -> None:
         skill = (ROOT / ".codex" / "skills" / "codex-kanban" / "SKILL.md").read_text(

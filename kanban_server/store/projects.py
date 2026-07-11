@@ -9,6 +9,9 @@ from .support import (
     DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME,
     DEFAULT_AI_AGENT_MANAGER_ROLE,
     DEFAULT_AI_AGENT_MANAGER_SUFFIX,
+    DEFAULT_CODEX_SUBAGENTS_DISPLAY_NAME,
+    DEFAULT_CODEX_SUBAGENTS_ROLE,
+    DEFAULT_CODEX_SUBAGENTS_SUFFIX,
     GENERIC_AGENT_PROFILES,
     MAX_ACTIVE_IMPLEMENTERS_PER_PROJECT,
     _json_dumps,
@@ -459,6 +462,9 @@ class ProjectStoreMixin(_StoreMixinContract):
         manager_id = slugify(f"{board_slug}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}")
         participant_ids.add(manager_id)
         self._seed_project_agent_manager(conn, board_slug, manager_id, now)
+        native_subagents_id = slugify(f"{board_slug}-{DEFAULT_CODEX_SUBAGENTS_SUFFIX}")
+        participant_ids.add(native_subagents_id)
+        self._seed_project_native_subagents(conn, board_slug, native_subagents_id, now)
         for profile in agent_profiles:
             profile_name = agent_profile_id(profile)
             if not profile_name:
@@ -525,6 +531,37 @@ class ProjectStoreMixin(_StoreMixinContract):
             ),
         )
 
+    @staticmethod
+    def _seed_project_native_subagents(
+        conn: sqlite3.Connection,
+        board_slug: str,
+        participant_id: str,
+        now: str,
+    ) -> None:
+        conn.execute(
+            """
+            INSERT INTO participants (
+                id, kind, display_name, role, status, current_board_slug,
+                current_scope, last_seen_at, created_at, updated_at
+            )
+            VALUES (?, 'agent', ?, ?, 'idle', ?, '', ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                display_name = excluded.display_name,
+                role = excluded.role,
+                current_board_slug = excluded.current_board_slug,
+                updated_at = excluded.updated_at
+            """,
+            (
+                participant_id,
+                DEFAULT_CODEX_SUBAGENTS_DISPLAY_NAME,
+                DEFAULT_CODEX_SUBAGENTS_ROLE,
+                board_slug,
+                now,
+                now,
+                now,
+            ),
+        )
+
     def _prune_removed_project_agents(
         self, conn: sqlite3.Connection, board_slug: str, participant_ids: set[str]
     ) -> None:
@@ -576,6 +613,7 @@ class ProjectStoreMixin(_StoreMixinContract):
             "agent_profiles": agent_profiles,
             "participant_ids": [
                 slugify(f"{board_slug}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}"),
+                slugify(f"{board_slug}-{DEFAULT_CODEX_SUBAGENTS_SUFFIX}"),
                 *(
                     slugify(f"{board_slug}-{profile}")
                     for profile in agent_profiles

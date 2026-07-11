@@ -8,6 +8,7 @@ from .support import (
     ACTIVE_PARTICIPANT_STATUSES,
     DEFAULT_ACTIVITY_EVENT_LIMIT,
     DEFAULT_AI_AGENT_MANAGER_SUFFIX,
+    DEFAULT_CODEX_SUBAGENTS_SUFFIX,
     EVENT_RETENTION_HOURS,
     PARTICIPANT_KINDS,
     STALE_AFTER_SECONDS,
@@ -42,6 +43,7 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
         if active_project:
             role_ids = {
                 slugify(f"{board_slug}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}"),
+                slugify(f"{board_slug}-{DEFAULT_CODEX_SUBAGENTS_SUFFIX}"),
                 *(
                     slugify(f"{board_slug}-{agent_profile_id(profile)}")
                     for profile in active_project.get("agent_profiles", [])
@@ -105,6 +107,7 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
                 continue
             runtime[key] = {
                 "id": raw_agent_id,
+                "agent_type": str(metadata.get("agent_type") or ""),
                 "status": status,
                 "model": str(metadata.get("model") or ""),
                 "session_id": str(metadata.get("session_id") or ""),
@@ -128,6 +131,7 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
                 participant["instances"].append(instance)
 
         active_cards: dict[str, dict[int, dict[str, Any]]] = {}
+        active_cards_by_id: dict[int, dict[str, Any]] = {}
         for card in conn.execute(
             """
             SELECT id, external_id, title, status, assignee_id, owner_id
@@ -145,6 +149,7 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
                 "title": card["title"],
                 "status": card["status"],
             }
+            active_cards_by_id[card["id"]] = card_summary
             for participant_id in {card["assignee_id"], card["owner_id"]} - {None, ""}:
                 if participant_id in participants_by_id:
                     active_cards.setdefault(participant_id, {})[card["id"]] = card_summary
@@ -170,15 +175,18 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
             participant["active_cards"] = list(
                 active_cards.get(str(participant.get("id") or ""), {}).values()
             )
-            if (
-                len(instances) == 1
-                and not instances[0].get("current_card_external_id")
-                and len(participant["active_cards"]) == 1
-            ):
-                active_card = participant["active_cards"][0]
-                instances[0]["current_card_external_id"] = active_card["external_id"]
-                instances[0]["current_card_title"] = active_card["title"]
-                instances[0]["card_source"] = "unique_active_assignment"
+            focused_card = active_cards_by_id.get(int(participant.get("current_card_id") or 0))
+            participant["focused_card"] = focused_card
+            if len(instances) == 1 and not instances[0].get("current_card_external_id"):
+                if focused_card:
+                    instances[0]["current_card_external_id"] = focused_card["external_id"]
+                    instances[0]["current_card_title"] = focused_card["title"]
+                    instances[0]["card_source"] = "explicit_participant_focus"
+                elif len(participant["active_cards"]) == 1:
+                    active_card = participant["active_cards"][0]
+                    instances[0]["current_card_external_id"] = active_card["external_id"]
+                    instances[0]["current_card_title"] = active_card["title"]
+                    instances[0]["card_source"] = "unique_active_assignment"
             if participant.get("kind") == "agent" and instances:
                 participant["status"] = str(instances[0]["status"])
                 participant["last_seen_at"] = max(
@@ -220,6 +228,15 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
                 board_slug=board_slug,
             )
             now = utc_now()
+            if self._payload_references_card(payload):
+                current_card_id = self._resolve_card_id(
+                    conn,
+                    payload,
+                    board_slug=board_slug,
+                    required=True,
+                )
+            else:
+                current_card_id = existing["current_card_id"] if existing else None
             values = {
                 "id": participant_id,
                 "kind": kind,
@@ -227,12 +244,7 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
                 "role": self._clean_text(payload.get("role"))
                 or (existing["role"] if existing else ""),
                 "status": status,
-                "current_card_id": self._resolve_card_id(
-                    conn,
-                    payload,
-                    board_slug=board_slug,
-                    required=self._payload_references_card(payload),
-                ),
+                "current_card_id": current_card_id,
                 "current_board_slug": board_slug,
                 "current_scope": self._clean_text(payload.get("current_scope"))
                 or (existing["current_scope"] if existing else ""),

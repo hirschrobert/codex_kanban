@@ -363,6 +363,7 @@ function renderParticipants() {
     const instances = Array.isArray(participant.instances) ? participant.instances : [];
     const activeModels = Array.isArray(participant.active_models) ? participant.active_models : [];
     const activeCards = Array.isArray(participant.active_cards) ? participant.active_cards : [];
+    const focusedCard = participant.focused_card;
     const liveness = instances.length
       ? `${instances.length} live instance${instances.length === 1 ? "" : "s"}`
       : participant.is_stale
@@ -387,6 +388,7 @@ function renderParticipants() {
       <span class="participant-main">
         <span class="participant-name">${escapeHtml(participant.display_name)}</span>
         <span class="participant-role">${escapeHtml(liveness)}${activeModels.length ? ` · ${escapeHtml(activeModels.join(", "))}` : ""} · ${escapeHtml(participant.role || participant.kind)}</span>
+        ${focusedCard ? `<span class="participant-role">Focused: ${escapeHtml(focusedCard.external_id || focusedCard.title)}</span>` : ""}
         ${activeCardSummary ? `<span class="participant-role">Cards: ${escapeHtml(activeCardSummary)}</span>` : ""}
         ${instanceRows ? `<span class="participant-instances">${instanceRows}</span>` : ""}
       </span>

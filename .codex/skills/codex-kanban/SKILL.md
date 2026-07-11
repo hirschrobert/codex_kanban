@@ -41,9 +41,9 @@ For command details and longer examples, see `docs/codex-kanban.md`.
    when the new local request is a same-object/same-topic follow-up on that
    branch; create a new branch when the work is unrelated or independently
    reviewable.
-6. Deliberately decide which board-scoped subagents should contribute before
-   starting material work. Use the smallest relevant set and record the reason
-   when delegation is useful or skipped.
+6. Let the main agent decide whether delegation helps and which available
+   built-in, custom, or board-scoped agents best fit. Board profiles are offers,
+   not a requirement, and skipping delegation needs no Kanban justification.
 7. Record start, block, handoff, finish, and delegated feedback through the
    ingester, CLI, or HTTP API.
 
@@ -182,9 +182,10 @@ board. Record the primary checkout in `target_repo` and the checkout that
 actually contains the changes in `worktree_path`; the dashboard exposes the
 worktree as the card's change source without treating it as another project.
 
-Use board-scoped participants only:
+Use board-scoped participants for Kanban state:
 
 - `<board>-ai-agent-manager`
+- `<board>-codex-subagents` for native built-in or unregistered runtime types
 - `<board>-kanban-auditor`
 - `<board>-project-architect`
 - `<board>-project-implementer`
@@ -198,17 +199,13 @@ bypassing Kanban.
 
 ## Multi-Agent Work
 
-Codex Kanban is a standing project instruction to consider specialized
-subagents at session start and before each material implementation, review,
-release-readiness, documentation, audit, domain, contract, architecture, or
-test-strategy step. Use them more consequently when delegation can improve
-software quality, usability, safety, maintainability, or data integrity. Choose
-from all available board-scoped profiles, including project-local profiles, but
-do not spawn every profile by default; select the smallest relevant set for
-independent scopes and say why they are being used. If the main agent decides
-not to delegate material work, record or summarize the reason. The main agent
-stays responsible for routing, integration, card hygiene, and final user
-summary.
+Codex Kanban coordinates work that Codex chooses to delegate; it does not force
+delegation or select agents on behalf of the main agent. The main agent decides
+whether the task benefits from subagents and whether Codex built-ins, arbitrary
+custom agents, registered board profiles, or single-agent execution are the
+best fit. Registered board profiles are an optional catalog of project-aware
+specialists, not the exclusive agent pool. The main agent stays responsible for
+routing, integration, card hygiene, and the final user summary.
 
 Agent profiles omit `model`, so inheritance from the calling session is the
 safe default. Before each delegation, the main agent should deliberately choose
@@ -226,12 +223,12 @@ selection:
 Keep model choice separate from role identity so concurrent instantiations of
 one role may use different models without creating duplicate People entries.
 
-Some Codex environments may still disallow spawning from standing repo or skill
-instructions alone. If delegation is useful but the tool is unavailable or
-disallowed, create/update the coordination cards and surface the blocker
-instead of silently doing delegated work in the parent context.
+People liveness observes every Codex-spawned subagent. Exact registered profile
+types use their durable board role; built-in `default`, `worker`, `explorer`,
+and unregistered custom types use `<board>-codex-subagents`, with the actual
+reported type shown on each runtime instance.
 
-Before delegating:
+When the main agent deliberately chooses a registered Kanban profile:
 
 - select the exact Codex custom-agent type whose `name` matches the assigned
   board profile, such as `project_reviewer`; a Kanban assignment, role name in
@@ -239,14 +236,18 @@ Before delegating:
 - treat `task_name` only as the concrete task/thread label, not as the agent
   type. Use the spawn surface's agent-type/profile selector and verify the
   returned runtime or `SubagentStart` event reports the requested type;
-- never present a `default` agent as a named specialist. If the active spawn
-  surface cannot select the exact custom-agent type, do not silently substitute
-  `default`: record the child/card as blocked by the missing spawn capability
-  and surface that limitation to the human;
+- never present a `default` agent as a named specialist. If exact profile
+  selection is unavailable, either let the main agent choose a suitable native
+  agent shown under `<board>-codex-subagents`, or surface the limitation when
+  the requested specialist configuration is essential.
+
+For delegated work that needs durable independent tracking:
+
 - create/update the parent coordination card;
-- create one child card for the main implementer and each delegated subagent
-  doing material work;
-- assign each child to a board-scoped participant;
+- create child cards for contributors whose scope needs its own branch,
+  worktree, checks, blocker, or handoff; do not require cards for ephemeral
+  exploration or support agents;
+- assign tracked children to the matching board-scoped participant;
 - choose disjoint write scopes; read-only reviewers/auditors may run in
   parallel;
 - record target repo, target branch, starting SHA, worktree path, checks, and
@@ -337,9 +338,9 @@ Before preparing, merging, tagging, publishing, or deploying:
 - stop if a done/approved card, ahead branch, or affected app has no
   include/exclude/deploy disposition.
 
-Release work should start a read-only `project_release_manager` or
-`kanban_auditor` for the intake audit whenever subagents are available and the
-task is more than a trivial status check.
+For release work, `project_release_manager` and `kanban_auditor` are available
+read-only profiles. The main agent may select either, another suitable agent,
+or no subagent based on the release's scope and risk.
 
 ## Card Contract
 
