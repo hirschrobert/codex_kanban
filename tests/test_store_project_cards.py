@@ -6,6 +6,40 @@ from tests.store_project_support import KanbanStoreProjectCase
 
 
 class KanbanStoreProjectCardsTest(KanbanStoreProjectCase):
+    def test_card_exposes_worktree_as_change_source(self) -> None:
+        store = self.make_store()
+        project = store.register_project(
+            {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "card_prefix": "DM",
+                "root_path": "/tmp/demo",
+            }
+        )
+        card = store.create_card(
+            {
+                "board_slug": project["board_slug"],
+                "title": "Worktree implementation",
+                "description": "Changes are isolated from the primary checkout.",
+                "target_repo": "/tmp/demo",
+                "worktree_path": "/tmp/worktrees/demo-feature",
+            }
+        )
+
+        snapshot_card = next(
+            item for item in store.snapshot("demo")["cards"] if item["id"] == card["id"]
+        )
+
+        self.assertEqual(
+            snapshot_card["change_source"],
+            {
+                "kind": "worktree",
+                "path": "/tmp/worktrees/demo-feature",
+                "repository_path": "/tmp/demo",
+            },
+        )
+
     def test_snapshot_marks_active_card_conflicts(self) -> None:
         store = self.make_store()
         project = store.register_project(

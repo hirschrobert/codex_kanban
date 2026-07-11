@@ -53,6 +53,18 @@ class PackagingTest(unittest.TestCase):
         self.assertIn("never present a default agent as a named specialist", plain_skill)
         self.assertIn("cannot select the exact custom-agent type", plain_skill)
 
+    def test_skill_keeps_worktrees_on_origin_board_and_cleans_them(self) -> None:
+        skill = (ROOT / ".codex" / "skills" / "codex-kanban" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        compact_skill = " ".join(skill.split()).replace("`", "")
+
+        self.assertIn("worktrees belong to the project registered", compact_skill)
+        self.assertIn("target_repo", compact_skill)
+        self.assertIn("worktree_path", compact_skill)
+        self.assertIn("worktree-cleanup", compact_skill)
+        self.assertIn("refuses active cards", compact_skill)
+
     @unittest.skipUnless(shutil.which("uv"), "uv is required for package build checks")
     def test_wheel_includes_dashboard_static_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

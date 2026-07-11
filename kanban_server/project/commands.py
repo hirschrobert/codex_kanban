@@ -10,6 +10,7 @@ from ..store.core import KanbanStore
 from ..store.support import slugify
 from .api import _patch_json, _post_json, _print_json, _request_json
 from .due import due_run as due_run
+from .git_ops import cleanup_merged_card_worktree
 from .payloads import (
     _agent_profiles,
     _card_comment_payload,
@@ -288,6 +289,49 @@ def participant_upsert(args: argparse.Namespace) -> int:
         }
     )
     _print_json(participant)
+    return 0
+
+
+def worktree_cleanup(args: argparse.Namespace) -> int:
+    card = None
+    if args.server_url:
+        card = _request_json(args.server_url, f"/api/cards/{args.card_id}")
+    store = KanbanStore(args.db)
+    if card is None:
+        card = store.get_card(args.card_id)
+    if card is None:
+        raise KeyError(f"card {args.card_id} not found")
+
+    result = cleanup_merged_card_worktree(card, merged_branch=args.merged_branch)
+    outcome = "already removed" if result["already_removed"] else "removed"
+    check = (
+        f"Worktree {result['worktree_path']} {outcome} after "
+        f"{result['feature_branch']} merged into {result['merged_branch']}."
+    )
+    checks = [*card.get("checks", [])]
+    if check not in checks:
+        checks.append(check)
+    dispositions = [*card.get("deployment_dispositions", [])]
+    cleanup_disposition = {
+        "label": "worktree cleanup",
+        "path": result["worktree_path"],
+        "status": "removed",
+        "note": f"feature branch merged into {result['merged_branch']}",
+    }
+    dispositions = [
+        item
+        for item in dispositions
+        if not (isinstance(item, dict) and item.get("label") == "worktree cleanup")
+    ]
+    dispositions.append(cleanup_disposition)
+    update = {"checks": checks, "deployment_dispositions": dispositions}
+    if args.server_url:
+        updated = _patch_json(args.server_url, f"/api/cards/{args.card_id}", update)
+    else:
+        updated = None
+    if updated is None:
+        updated = store.update_card(args.card_id, update)
+    _print_json({**result, "card": updated})
     return 0
 
 

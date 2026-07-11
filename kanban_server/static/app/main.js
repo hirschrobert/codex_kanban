@@ -252,6 +252,16 @@ function affectedProjectChipsHtml(card) {
   ].join("");
 }
 
+function changeSourceChipHtml(card) {
+  const source = card.change_source;
+  if (!source?.path) return "";
+  if (source.kind !== "worktree") return "";
+  const name = source.path.split(/[\\/]/).filter(Boolean).pop() || source.path;
+  const repository = source.repository_path ? `; origin repository: ${source.repository_path}` : "";
+  const title = `Changes sourced from worktree: ${source.path}${repository}`;
+  return `<span class="chip worktree-source-chip" title="${escapeHtml(title)}">Worktree: ${escapeHtml(name)}</span>`;
+}
+
 function renderCard(card) {
   const cardEl = document.createElement("article");
   cardEl.draggable = true;
@@ -309,6 +319,7 @@ function renderCard(card) {
         ${affectedCount ? `<span class="chip">Affected: ${affectedCount}</span>` : ""}
         ${affectedProjectCount ? `<span class="chip">Ecosystem: ${affectedProjectCount}</span>` : ""}
         ${affectedProjectChipsHtml(card)}
+        ${changeSourceChipHtml(card)}
         ${deploymentCount ? `<span class="chip">Deploy: ${deploymentCount}</span>` : ""}
         ${card.target_branch ? `<span class="chip">${escapeHtml(card.target_branch)}</span>` : ""}
         ${card.feature_branch ? `<span class="chip">${escapeHtml(card.feature_branch)}</span>` : ""}
