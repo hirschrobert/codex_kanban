@@ -226,6 +226,16 @@ instead of silently doing delegated work in the parent context.
 
 Before delegating:
 
+- select the exact Codex custom-agent type whose `name` matches the assigned
+  board profile, such as `project_reviewer`; a Kanban assignment, role name in
+  the prompt, or `task_name` does not select that agent or load its TOML file;
+- treat `task_name` only as the concrete task/thread label, not as the agent
+  type. Use the spawn surface's agent-type/profile selector and verify the
+  returned runtime or `SubagentStart` event reports the requested type;
+- never present a `default` agent as a named specialist. If the active spawn
+  surface cannot select the exact custom-agent type, do not silently substitute
+  `default`: record the child/card as blocked by the missing spawn capability
+  and surface that limitation to the human;
 - create/update the parent coordination card;
 - create one child card for the main implementer and each delegated subagent
   doing material work;
