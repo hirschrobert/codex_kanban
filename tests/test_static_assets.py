@@ -77,6 +77,7 @@ class StaticAssetTest(unittest.TestCase):
 
         self.assertIn("function agentInstanceSummary(instance)", model)
         self.assertIn("normalText(instance?.agent_type)", model)
+        self.assertIn("Focused:", app)
         self.assertIn("participant.instances", app)
         self.assertIn('class="participant-instance"', app)
         self.assertIn("event.metadata?.model", app)
