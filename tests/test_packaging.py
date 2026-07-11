@@ -41,6 +41,18 @@ class PackagingTest(unittest.TestCase):
         self.assertIn("supported lighter model", compact_skill)
         self.assertIn("actual runtime model", compact_skill)
 
+    def test_skill_requires_exact_custom_agent_selection(self) -> None:
+        skill = (ROOT / ".codex" / "skills" / "codex-kanban" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        compact_skill = " ".join(skill.split())
+        plain_skill = compact_skill.replace("`", "")
+
+        self.assertIn("exact Codex custom-agent type", plain_skill)
+        self.assertIn("task_name does not select that agent", plain_skill)
+        self.assertIn("never present a default agent as a named specialist", plain_skill)
+        self.assertIn("cannot select the exact custom-agent type", plain_skill)
+
     @unittest.skipUnless(shutil.which("uv"), "uv is required for package build checks")
     def test_wheel_includes_dashboard_static_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
