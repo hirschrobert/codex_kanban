@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
-from .support import DEFAULT_OVERVIEW_DONE_LIMIT, slugify
+from .support import (
+    DEFAULT_DONE_LOOKBACK_DAYS,
+    DEFAULT_OVERVIEW_DONE_LIMIT,
+    _utc_datetime,
+    slugify,
+)
 
 if TYPE_CHECKING:
     from .contracts import StoreMixinContract as _StoreMixinContract
@@ -25,7 +30,9 @@ class OverviewStoreMixin(_StoreMixinContract):
         archived_only: bool = False,
         limit: int = 0,
         done_limit: int = DEFAULT_OVERVIEW_DONE_LIMIT,
+        include_old_done: bool = False,
     ) -> dict[str, Any]:
+        include_old_done = include_old_done or done_limit < 0
         resolution = self.resolve_project_for_paths([path for path in (cwd, repo) if path])
         matched_project = resolution["project"]
         resolution_payload = {key: value for key, value in resolution.items() if key != "project"}
@@ -55,7 +62,12 @@ class OverviewStoreMixin(_StoreMixinContract):
                 agent_refresh = self._refresh_project_agents(conn, active_project)
                 active_project = agent_refresh["project"]
             projects = self._overview_projects(conn)
-            cards, done_card_count, done_cards_hidden_count = self._overview_cards(
+            (
+                cards,
+                done_card_count,
+                done_cards_hidden_count,
+                old_done_cards_hidden_count,
+            ) = self._overview_cards(
                 conn,
                 effective_board_slug,
                 active_project=active_project,
@@ -63,6 +75,7 @@ class OverviewStoreMixin(_StoreMixinContract):
                 archived_only=archived_only,
                 limit=limit,
                 done_limit=done_limit,
+                include_old_done=include_old_done,
             )
             archived_count = self._archived_card_count(conn, effective_board_slug)
             return {
@@ -83,6 +96,13 @@ class OverviewStoreMixin(_StoreMixinContract):
                 "cards": cards,
                 "card_count": len(cards),
                 "done_limit": done_limit,
+                "done_lookback_days": DEFAULT_DONE_LOOKBACK_DAYS,
+                "done_cutoff": self._format_utc(
+                    datetime.now(UTC) - timedelta(days=DEFAULT_DONE_LOOKBACK_DAYS)
+                ),
+                "include_old_done": include_old_done,
+                "old_done_cards_hidden_count": old_done_cards_hidden_count,
+                "old_done_cards_hidden": old_done_cards_hidden_count > 0,
                 "done_card_count": done_card_count,
                 "done_cards_hidden_count": done_cards_hidden_count,
                 "done_cards_hidden": done_cards_hidden_count > 0,
@@ -131,7 +151,8 @@ class OverviewStoreMixin(_StoreMixinContract):
         archived_only: bool,
         limit: int,
         done_limit: int,
-    ) -> tuple[list[dict[str, Any]], int, int]:
+        include_old_done: bool,
+    ) -> tuple[list[dict[str, Any]], int, int, int]:
         archived_filter = self._archived_filter(
             include_archived=include_archived,
             archived_only=archived_only,
@@ -159,7 +180,19 @@ class OverviewStoreMixin(_StoreMixinContract):
             query += " LIMIT ?"
             params.append(limit)
         cards = [self._card_from_row(row) for row in conn.execute(query, params)]
-        cards, done_card_count, done_cards_hidden_count = self._limit_done_cards(
+        total_done_count = sum(1 for card in cards if card.get("status") == "done")
+        old_done_hidden = 0
+        if not include_old_done and not include_archived and not archived_only:
+            cutoff = datetime.now(UTC) - timedelta(days=DEFAULT_DONE_LOOKBACK_DAYS)
+            recent_cards = []
+            for card in cards:
+                updated_at = _utc_datetime(card.get("updated_at") or card.get("created_at"))
+                if card.get("status") == "done" and updated_at and updated_at < cutoff:
+                    old_done_hidden += 1
+                else:
+                    recent_cards.append(card)
+            cards = recent_cards
+        cards, _recent_done_count, limit_hidden_count = self._limit_done_cards(
             cards,
             done_limit,
         )
@@ -170,8 +203,9 @@ class OverviewStoreMixin(_StoreMixinContract):
         cards = self._cards_with_coordination(cards, participants)
         return (
             [self._overview_card(card) for card in cards],
-            done_card_count,
-            done_cards_hidden_count,
+            total_done_count,
+            old_done_hidden + limit_hidden_count,
+            old_done_hidden,
         )
 
     @staticmethod

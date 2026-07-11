@@ -17,6 +17,7 @@ from typing import Any, cast
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .app_metadata import app_metadata as current_app_metadata
+from .live import EventBroker
 from .project.registration import auto_register_payload_for_cwd
 from .store.core import KanbanStore
 from .store.support import DEFAULT_DB_PATH, DEFAULT_OVERVIEW_DONE_LIMIT, EVENT_RETENTION_HOURS
@@ -179,92 +180,6 @@ def _address_in_use_message(host: str, port: int, pid: int | None) -> str:
     )
 
 
-class EventBroker:
-    def __init__(self) -> None:
-        self._clients: dict[queue.Queue[dict[str, Any]], dict[str, Any]] = {}
-        self._lock = threading.Lock()
-
-    def subscribe(
-        self,
-        board_slug: str,
-        *,
-        include_archived: bool = False,
-        archived_only: bool = False,
-    ) -> queue.Queue[dict[str, Any]]:
-        client: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=8)
-        with self._lock:
-            self._clients[client] = {
-                "board_slug": board_slug,
-                "include_archived": include_archived,
-                "archived_only": archived_only,
-            }
-        return client
-
-    def unsubscribe(self, client: queue.Queue[dict[str, Any]]) -> None:
-        with self._lock:
-            self._clients.pop(client, None)
-
-    def publish(self, board_slug: str, event: str, data: dict[str, Any]) -> None:
-        message = {"event": event, "data": data}
-        with self._lock:
-            clients = [
-                client
-                for client, settings in self._clients.items()
-                if settings["board_slug"] == board_slug
-            ]
-        for client in clients:
-            self._put(client, message)
-
-    def publish_snapshots(
-        self,
-        board_slug: str,
-        store: KanbanStore,
-        app_metadata: dict[str, Any] | None = None,
-    ) -> None:
-        with self._lock:
-            clients = [
-                (client, dict(settings))
-                for client, settings in self._clients.items()
-                if settings["board_slug"] == board_slug
-            ]
-        snapshots: dict[tuple[bool, bool], dict[str, Any]] = {}
-        for client, settings in clients:
-            snapshot_key = (
-                bool(settings.get("include_archived")),
-                bool(settings.get("archived_only")),
-            )
-            if snapshot_key not in snapshots:
-                snapshots[snapshot_key] = store.snapshot(
-                    board_slug,
-                    include_archived=snapshot_key[0],
-                    archived_only=snapshot_key[1],
-                )
-                snapshots[snapshot_key]["app"] = dict(app_metadata or {})
-            self._put(
-                client,
-                {
-                    "event": "snapshot",
-                    "data": snapshots[snapshot_key],
-                },
-            )
-
-    def _put(self, client: queue.Queue[dict[str, Any]], message: dict[str, Any]) -> None:
-        try:
-            client.put_nowait(message)
-        except queue.Full:
-            try:
-                client.get_nowait()
-                client.put_nowait(message)
-            except queue.Full:
-                pass
-            except queue.Empty:
-                pass
-
-    def board_slugs(self) -> set[str]:
-        with self._lock:
-            return {settings["board_slug"] for settings in self._clients.values()}
-
-
 class KanbanHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
 
@@ -320,11 +235,13 @@ class KanbanHandler(BaseHTTPRequestHandler):
                     "yes",
                     "on",
                 }
+                include_old_done = self._truthy_query(query, "include_old_done")
                 self._send_json(
                     self._snapshot(
                         board or self.kanban_server.default_board_slug,
                         include_archived=include_archived,
                         archived_only=archived_only,
+                        include_old_done=include_old_done,
                     )
                 )
                 return
@@ -368,6 +285,7 @@ class KanbanHandler(BaseHTTPRequestHandler):
                     "done_limit",
                     default=DEFAULT_OVERVIEW_DONE_LIMIT,
                 )
+                include_old_done = self._truthy_query(query, "include_old_done") or done_limit < 0
                 result = self.kanban_server.store.overview(
                     board,
                     cwd=cwd,
@@ -376,6 +294,7 @@ class KanbanHandler(BaseHTTPRequestHandler):
                     archived_only=archived_only,
                     limit=limit,
                     done_limit=done_limit,
+                    include_old_done=include_old_done,
                 )
                 if (
                     self._truthy_query(query, "register_if_missing")
@@ -400,6 +319,7 @@ class KanbanHandler(BaseHTTPRequestHandler):
                             archived_only=archived_only,
                             limit=limit,
                             done_limit=done_limit,
+                            include_old_done=include_old_done,
                         )
                         result["registered_project"] = registered_project
                 if result.get("agent_profiles_refreshed") and result.get("board"):
@@ -449,6 +369,18 @@ class KanbanHandler(BaseHTTPRequestHandler):
                 )
                 return
             parts = parsed.path.strip("/").split("/")
+            if parsed.path == "/api/cards/archive-candidates":
+                query = parse_qs(parsed.query)
+                board = (
+                    query.get("board", [None])[0]
+                    or self.kanban_server.default_board_slug
+                    or self.kanban_server.store.default_board_slug()
+                )
+                days = self._int_query(query, "older_than_days", default=2)
+                self._send_json(
+                    self.kanban_server.store.old_done_cards(board, older_than_days=days)
+                )
+                return
             if len(parts) == 3 and parts[:2] == ["api", "cards"]:
                 card_id = int(parts[2])
                 card = self.kanban_server.store.get_card(card_id)
@@ -477,8 +409,14 @@ class KanbanHandler(BaseHTTPRequestHandler):
         try:
             payload = self._read_json()
             if parsed.path == "/api/projects":
+                existing_projects = {
+                    project["slug"]: project
+                    for project in self.kanban_server.store.list_projects(include_removed=True)
+                }
                 project = self.kanban_server.store.register_project(payload)
-                self._broadcast_project_change(project["board_slug"])
+                existing = existing_projects.get(project["slug"])
+                if self._project_signature(existing) != self._project_signature(project):
+                    self._broadcast_project_change(project["board_slug"])
                 self._send_json(project, HTTPStatus.CREATED)
                 return
 
@@ -512,6 +450,40 @@ class KanbanHandler(BaseHTTPRequestHandler):
                 )
                 self._broadcast(card["board_slug"])
                 self._send_json(card, HTTPStatus.CREATED)
+                return
+
+            if parsed.path == "/api/cards/archive-old-done":
+                board = (
+                    payload.get("board_slug")
+                    or payload.get("board")
+                    or self.kanban_server.default_board_slug
+                    or self.kanban_server.store.default_board_slug()
+                )
+                result = self.kanban_server.store.archive_old_done_cards(
+                    board,
+                    older_than_days=int(payload.get("older_than_days") or 2),
+                    card_ids=(
+                        [int(card_id) for card_id in payload["card_ids"]]
+                        if isinstance(payload.get("card_ids"), list)
+                        else None
+                    ),
+                )
+                if result["count"]:
+                    external_ids = [card["external_id"] for card in result["cards"]]
+                    self.kanban_server.store.create_event(
+                        {
+                            "board_slug": board,
+                            "event_type": "cards.archived_bulk",
+                            "message": f"Archived {result['count']} old done card(s)",
+                            "metadata": {
+                                "card_external_ids": external_ids,
+                                "cutoff": result["cutoff"],
+                                "older_than_days": result["days"],
+                            },
+                        }
+                    )
+                    self._broadcast(board)
+                self._send_json(result)
                 return
 
             if len(parts) == 4 and parts[:2] == ["api", "cards"]:
@@ -709,11 +681,14 @@ class KanbanHandler(BaseHTTPRequestHandler):
             self._send_error(exc)
 
     def _broadcast(self, board_slug: str) -> None:
-        self.kanban_server.broker.publish_snapshots(
-            board_slug,
-            self.kanban_server.store,
-            self.kanban_server.app_metadata,
-        )
+        self.kanban_server.broker.publish_change(board_slug)
+
+    @staticmethod
+    def _project_signature(project: dict[str, Any] | None) -> dict[str, Any] | None:
+        if project is None:
+            return None
+        ignored = {"updated_at", "card_count", "participant_count"}
+        return {key: value for key, value in project.items() if key not in ignored}
 
     def _broadcast_project_change(self, board_slug: str | None = None) -> None:
         board_slugs = self.kanban_server.broker.board_slugs()
@@ -736,11 +711,7 @@ class KanbanHandler(BaseHTTPRequestHandler):
         self.send_header("X-Accel-Buffering", "no")
         self._cors_headers()
         self.end_headers()
-        client = self.kanban_server.broker.subscribe(
-            board_slug,
-            include_archived=include_archived,
-            archived_only=archived_only,
-        )
+        client = self.kanban_server.broker.subscribe(board_slug)
         try:
             self._write_sse(
                 "snapshot",
@@ -773,6 +744,7 @@ class KanbanHandler(BaseHTTPRequestHandler):
         *,
         include_archived: bool = False,
         archived_only: bool = False,
+        include_old_done: bool = False,
     ) -> dict[str, Any]:
         if board_slug:
             self.kanban_server.store.refresh_project_agents(board_slug)
@@ -780,6 +752,7 @@ class KanbanHandler(BaseHTTPRequestHandler):
             board_slug,
             include_archived=include_archived,
             archived_only=archived_only,
+            include_old_done=include_old_done,
         )
         snapshot["app"] = dict(self.kanban_server.app_metadata)
         return snapshot
@@ -854,11 +827,7 @@ def _run_scheduler(server: KanbanHTTPServer) -> None:
             results = server.store.run_due_repeating_cards()
             board_slugs = {result["card"]["board_slug"] for result in results if result.get("card")}
             for board_slug in board_slugs:
-                server.broker.publish_snapshots(
-                    board_slug,
-                    server.store,
-                    server.app_metadata,
-                )
+                server.broker.publish_change(board_slug)
         except Exception as exc:
             sys.stderr.write(f"Codex Kanban scheduler error: {exc}\n")
         server.scheduler_stop.wait(60)

@@ -26,6 +26,7 @@ class StaticAssetTest(unittest.TestCase):
             "/static/app/api.js",
             "/static/app/model.js",
             "/static/app/project-settings.js",
+            "/static/app/archive-old.js",
             "/static/app/main.js",
         ]
         positions = [html.index(f'src="{script}"') for script in scripts]
@@ -287,6 +288,7 @@ for (const file of [
   "app/api.js",
   "app/model.js",
   "app/project-settings.js",
+  "app/archive-old.js",
   "app/main.js"
 ]) {{
   vm.runInContext(fs.readFileSync(`${{staticDir}}/${{file}}`, "utf8"), context, {{

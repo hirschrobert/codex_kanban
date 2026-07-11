@@ -80,10 +80,10 @@ python3 -m kanban_server.project overview \
 
 The overview resolves the current repo or ecosystem path to the registered
 board, lists all non-done non-archived cards with descriptions, includes only
-the latest five done cards by default, includes affected registered project
-paths, and reports how many archived and done cards are hidden. Use
-`--done-limit -1` when completed-card history matters, and use `--archived-only`
-when older archived context may matter. `--register-if-missing` only
+the latest five done cards updated within the last two days by default, includes
+affected registered project paths, and reports how many archived and done cards
+are hidden. Use `--done-limit -1` when complete done-card history matters, and
+use `--archived-only` when older archived context may matter. `--register-if-missing` only
 auto-registers a single repo whose `AGENTS.md` opts into `codex-kanban`;
 ecosystems still need explicit repeated `--path` and `--instruction` values.
 The same overview also refreshes board-scoped AI participants from current
@@ -411,8 +411,9 @@ python3 -m kanban_server.project overview \
   --register-if-missing
 ```
 
-Use `snapshot` when an agent needs full events, participants, comments, or an
-archived-inclusive board view.
+Use `snapshot` when an agent needs events, participants, comments, or an
+archived-inclusive board view. Its default card set also omits done cards older
+than two days; `snapshot --done-limit -1` explicitly retrieves them.
 
 Create a human-readable card with concrete context:
 
@@ -640,6 +641,9 @@ implementers on that project.
 - `GET /api/snapshot?board=<board_slug>`
 - `GET /api/snapshot?board=<board_slug>&archived_only=1`
 - `GET /api/snapshot?board=<board_slug>&include_archived=1`
+- `GET /api/snapshot?board=<board_slug>&include_old_done=1`
+- `GET /api/cards/archive-candidates?board=<board_slug>&older_than_days=2`
+- `POST /api/cards/archive-old-done`
 - `GET /api/overview?cwd=<path>&repo=<path>`
 - `GET /api/overview?cwd=<path>&archived_only=1`
 - `GET /api/projects`

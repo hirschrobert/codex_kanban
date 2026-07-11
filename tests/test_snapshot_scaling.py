@@ -370,45 +370,25 @@ class SnapshotScalingTest(unittest.TestCase):
 
 
 class EventBrokerScalingTest(unittest.TestCase):
-    def test_publish_snapshots_reuses_snapshot_per_subscription_options(self) -> None:
+    def test_publish_change_is_lightweight_and_board_scoped(self) -> None:
         broker = EventBroker()
         default_a = broker.subscribe("demo")
         default_b = broker.subscribe("demo")
-        archived = broker.subscribe("demo", archived_only=True)
         other = broker.subscribe("other")
-        store = CountingSnapshotStore()
+        broker.publish_change("demo")
 
-        broker.publish_snapshots("demo", store)  # type: ignore[arg-type]
-
-        self.assertEqual(
-            store.calls,
-            [
-                ("demo", False, False),
-                ("demo", False, True),
-            ],
-        )
-        self.assertIs(default_a.get_nowait()["data"], default_b.get_nowait()["data"])
-        self.assertEqual(archived.get_nowait()["data"]["archived_only"], True)
+        self.assertEqual(default_a.get_nowait()["event"], "change")
+        self.assertEqual(default_b.get_nowait()["data"], {"board_slug": "demo"})
         self.assertTrue(other.empty())
 
+    def test_publish_change_coalesces_while_client_is_slow(self) -> None:
+        broker = EventBroker()
+        client = broker.subscribe("demo")
 
-class CountingSnapshotStore:
-    def __init__(self) -> None:
-        self.calls: list[tuple[str, bool, bool]] = []
+        broker.publish_change("demo")
+        broker.publish_change("demo")
 
-    def snapshot(
-        self,
-        board_slug: str,
-        *,
-        include_archived: bool = False,
-        archived_only: bool = False,
-    ) -> dict[str, Any]:
-        self.calls.append((board_slug, include_archived, archived_only))
-        return {
-            "board": {"slug": board_slug},
-            "include_archived": include_archived,
-            "archived_only": archived_only,
-        }
+        self.assertEqual(client.qsize(), 1)
 
 
 if __name__ == "__main__":

@@ -166,6 +166,28 @@ class ProjectCliOverviewTest(unittest.TestCase):
             [card["id"] for card in reversed(done_cards)],
         )
 
+    def test_overview_requires_explicit_history_for_done_cards_older_than_two_days(self) -> None:
+        db_path = self.make_db_path()
+        store = KanbanStore(db_path)
+        old_done = store.create_card(
+            {"title": "Old done", "description": "Historical.", "status": "done"}
+        )
+        with store._connect() as conn:
+            conn.execute(
+                "UPDATE cards SET created_at = ?, updated_at = ? WHERE id = ?",
+                ("2020-01-01T00:00:00Z", "2020-01-01T00:00:00Z", old_done["id"]),
+            )
+
+        overview = json.loads(self.capture_project_main(["overview", "--db", str(db_path)]))
+        history = json.loads(
+            self.capture_project_main(["overview", "--db", str(db_path), "--done-limit", "-1"])
+        )
+
+        self.assertNotIn(old_done["id"], [card["id"] for card in overview["cards"]])
+        self.assertEqual(overview["done_cards_hidden_count"], 1)
+        self.assertEqual(overview["old_done_cards_hidden_count"], 1)
+        self.assertIn(old_done["id"], [card["id"] for card in history["cards"]])
+
     def test_snapshot_done_limit_flag_controls_completed_cards(self) -> None:
         db_path = self.make_db_path()
         store = KanbanStore(db_path)

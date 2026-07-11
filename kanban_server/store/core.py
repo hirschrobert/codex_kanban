@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypeVar
 
+from .archival import CardArchivalStoreMixin
 from .cards import CardStoreMixin
 from .dependencies import DependencyStoreMixin
 from .events import EventRelationStoreMixin
@@ -38,6 +39,7 @@ class KanbanStore(
     SchemaStoreMixin,
     ProjectStoreMixin,
     OverviewStoreMixin,
+    CardArchivalStoreMixin,
     CardStoreMixin,
     ParticipantEventStoreMixin,
     EventRelationStoreMixin,
