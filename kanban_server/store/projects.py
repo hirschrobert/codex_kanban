@@ -4,6 +4,7 @@ import sqlite3
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ..git_worktrees import git_worktree_context
 from .support import (
     DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME,
     DEFAULT_AI_AGENT_MANAGER_ROLE,
@@ -147,7 +148,30 @@ class ProjectStoreMixin(_StoreMixinContract):
 
     def list_projects(self, include_removed: bool = False) -> list[dict[str, Any]]:
         with self._lock, self._connect() as conn:
-            return self._list_projects(conn, include_removed=include_removed)
+            projects = self._list_projects(conn, include_removed=include_removed)
+            return projects if include_removed else self._visible_projects(projects)
+
+    def _visible_projects(self, projects: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        candidate_paths = {
+            str(Path(candidate["path"]).expanduser().resolve()): str(project.get("slug"))
+            for project in projects
+            if not project.get("removed_at")
+            for candidate in self._project_path_candidates(project)
+        }
+        visible: list[dict[str, Any]] = []
+        for project in projects:
+            root_path = str(project.get("root_path") or "").strip()
+            context = git_worktree_context(root_path) if root_path else None
+            primary_owner = candidate_paths.get(str(context["primary_root"])) if context else None
+            if (
+                context
+                and context["is_linked_worktree"]
+                and primary_owner
+                and primary_owner != project.get("slug")
+            ):
+                continue
+            visible.append(project)
+        return visible
 
     def _migrate_project_board_slug(
         self,
@@ -327,7 +351,7 @@ class ProjectStoreMixin(_StoreMixinContract):
             seen_query_paths.add(query_key)
             query_paths.append(query_path)
         with self._lock, self._connect() as conn:
-            projects = self._list_projects(conn, include_removed=False)
+            projects = self._visible_projects(self._list_projects(conn, include_removed=False))
 
         matches: list[dict[str, Any]] = []
         winning_project_slugs: set[str] = set()
@@ -335,30 +359,41 @@ class ProjectStoreMixin(_StoreMixinContract):
         ambiguity_reason = ""
         for query_path in query_paths:
             query_matches: list[dict[str, Any]] = []
+            context = git_worktree_context(query_path)
+            identity_paths = [query_path]
+            if context and context["is_linked_worktree"]:
+                identity_paths.insert(0, context["primary_root"])
             for project in projects:
                 for candidate in self._project_path_candidates(project):
                     candidate_path = Path(candidate["path"]).expanduser().resolve()
-                    try:
-                        query_path.relative_to(candidate_path)
-                    except ValueError:
-                        continue
-                    query_matches.append(
-                        {
-                            "project": project,
-                            "project_slug": project.get("slug"),
-                            "board_slug": project.get("board_slug"),
-                            "display_name": project.get("display_name"),
-                            "query_path": str(query_path),
-                            "matched_path": str(candidate_path),
-                            "label": candidate["label"],
-                            "score": len(candidate_path.parts),
-                        }
-                    )
+                    for identity_rank, identity_path in enumerate(identity_paths):
+                        try:
+                            identity_path.relative_to(candidate_path)
+                        except ValueError:
+                            continue
+                        query_matches.append(
+                            {
+                                "project": project,
+                                "project_slug": project.get("slug"),
+                                "board_slug": project.get("board_slug"),
+                                "display_name": project.get("display_name"),
+                                "query_path": str(query_path),
+                                "identity_path": str(identity_path),
+                                "matched_path": str(candidate_path),
+                                "label": candidate["label"],
+                                "identity_rank": identity_rank,
+                                "score": len(candidate_path.parts),
+                            }
+                        )
             matches.extend(query_matches)
             if not query_matches:
                 continue
-            best_score = max(int(match["score"]) for match in query_matches)
-            winners = [match for match in query_matches if int(match["score"]) == best_score]
+            best_rank = min(int(match["identity_rank"]) for match in query_matches)
+            ranked_matches = [
+                match for match in query_matches if int(match["identity_rank"]) == best_rank
+            ]
+            best_score = max(int(match["score"]) for match in ranked_matches)
+            winners = [match for match in ranked_matches if int(match["score"]) == best_score]
             winner_slugs = {str(match["project_slug"]) for match in winners}
             if len(winner_slugs) > 1:
                 ambiguous = True
