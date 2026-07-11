@@ -796,7 +796,7 @@ class KanbanStoreTest(unittest.TestCase):
         self.assertIn("test.boundary", event_types)
         self.assertIn("test.recent", event_types)
 
-    def test_snapshot_marks_stale_active_agent_and_card(self) -> None:
+    def test_snapshot_keeps_role_idle_when_no_runtime_instance_is_live(self) -> None:
         store = self.make_store()
         project = store.register_project(
             {
@@ -842,10 +842,12 @@ class KanbanStoreTest(unittest.TestCase):
         )
         stale_card = next(item for item in snapshot["cards"] if item["id"] == card["id"])
 
-        self.assertTrue(participant["is_stale"])
+        self.assertFalse(participant["is_stale"])
         self.assertFalse(participant["is_active"])
-        self.assertTrue(stale_card["assignee_is_stale"])
-        self.assertIn("not checked in", stale_card["coordination_warnings"][0])
+        self.assertFalse(participant["has_live_instances"])
+        self.assertFalse(stale_card["assignee_is_stale"])
+        self.assertFalse(stale_card["assignee_has_live_instances"])
+        self.assertIn("no live instantiation", stale_card["coordination_warnings"][0])
 
     def test_active_implementer_limit_uses_project_setting(self) -> None:
         store = self.make_store()

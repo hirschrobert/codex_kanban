@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.1.12 - 2026-07-11
+
+This release makes agent model selection follow the active Codex turn and
+replaces stale runtime-agent People rows with a role-based realtime overview.
+It also strengthens release disclosures so exact AI models and the exact
+Codex Kanban coordination commit are auditable.
+
+Public commits:
+
+- `b18d641` removes pinned model names from packaged agent profiles so spawned
+  agents inherit the calling Codex turn's model, and records the authoritative
+  model, session, and turn identifiers from hook payloads.
+- `a19691f` groups fresh runtime instantiations under stable board-scoped agent
+  roles, shows per-instance state/model details, and removes finished or stale
+  instances from the live People overview without losing Activity history.
+- `944534c` requires versioned model slugs/named variants, agent-role
+  attribution, and an exact Codex Kanban coordination commit SHA in release AI
+  disclosures, and tightens the verified 0.1.11 disclosure.
+- `64f3331` merges CK-0665, CK-0666, and CK-0669 into `release/0.1.12`.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Made packaged role profiles model-agnostic so each spawned agent inherits
+  the model active for the Codex turn that starts it.
+- Recorded exact per-turn runtime model, session, and turn identifiers from
+  Codex hook payloads and surfaced model/turn information in Activity.
+- Kept People entries stable at the configured role level while nesting all
+  fresh concurrent instantiations with their status, card, scope, and model.
+- Removed finished instantiations immediately and aged abandoned running,
+  waiting, or idle instantiations out after the configured stale interval.
+- Required exact, evidence-backed AI model and Codex Kanban coordination
+  hashes in future release disclosures.
+
+AI disclosure:
+
+This release was developed, reviewed, audited, and prepared with AI assistance
+using the exact model `gpt-5.6` (GPT-5.6 Sol). It was used by the main AI Agent
+Manager and the delegated Project Architect and Project Release Manager roles.
+The work was coordinated with the installed/running Codex Kanban checkout at
+commit `095e5fd`.
+
 ## 0.1.11 - 2026-07-04
 
 This release improves Activity handling, event retention, branch guidance,
@@ -91,7 +138,10 @@ Changes:
 AI disclosure:
 
 This release was developed, reviewed, and prepared with help from AI agents
-using GPT-5, coordinated through the Codex Kanban workflow.
+using the exact model `gpt-5.6` (GPT-5.6 Sol) for the main coordinating agent and its
+delegated implementation, review, and release agents. The work was coordinated
+with Codex Kanban commit
+`83fb4ca`, the verified release immediately preceding 0.1.11.
 
 ## 0.1.10 - 2026-07-04
 

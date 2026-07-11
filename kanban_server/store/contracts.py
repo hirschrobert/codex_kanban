@@ -163,6 +163,16 @@ class StoreMixinContract:
         now: datetime,
     ) -> dict[str, Any]: ...
 
+    def _participants_with_runtime(
+        self,
+        conn: sqlite3.Connection,
+        rows: list[sqlite3.Row],
+        *,
+        board_slug: str,
+        active_project: dict[str, Any] | None,
+        now: datetime,
+    ) -> list[dict[str, Any]]: ...
+
     @staticmethod
     def _payload_has_link_updates(payload: dict[str, Any]) -> bool: ...
 

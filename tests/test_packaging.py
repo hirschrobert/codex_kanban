@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import tempfile
+import tomllib
 import unittest
 import zipfile
 from pathlib import Path
@@ -11,6 +12,27 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class PackagingTest(unittest.TestCase):
+    def test_release_instructions_require_exact_ai_disclosure_evidence(self) -> None:
+        instructions = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        skill = (ROOT / ".codex" / "skills" / "codex-kanban" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+
+        for document in (instructions, skill):
+            self.assertIn("exact", document)
+            self.assertIn("versioned model slug", document)
+            self.assertIn("short, unambiguous commit SHA", document)
+            self.assertIn("gpt-5", document)
+
+    def test_packaged_agent_profiles_inherit_the_session_model(self) -> None:
+        profiles = sorted((ROOT / ".codex" / "agents").glob("*.toml"))
+
+        self.assertTrue(profiles)
+        for profile in profiles:
+            with self.subTest(profile=profile.name):
+                data = tomllib.loads(profile.read_text(encoding="utf-8"))
+                self.assertNotIn("model", data)
+
     @unittest.skipUnless(shutil.which("uv"), "uv is required for package build checks")
     def test_wheel_includes_dashboard_static_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

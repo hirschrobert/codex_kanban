@@ -1,6 +1,5 @@
 name = "api_contract_steward"
 description = "Read-only OpenAPI, AsyncAPI, schema, and contract-first reviewer."
-model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Contract", "Schema", "Interface"]
