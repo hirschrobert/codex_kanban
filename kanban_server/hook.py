@@ -226,6 +226,40 @@ def _participant_id_for_hook(
     return slugify(f"{board_slug}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}"), raw_agent_id
 
 
+def _participant_for_untyped_subagent(
+    store: KanbanStore,
+    board_slug: str,
+    raw_agent_id: str,
+) -> tuple[str, str, str]:
+    """Resolve a default Codex subagent only when board state is unambiguous."""
+    manager_id = slugify(f"{board_slug}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}")
+    participants = [
+        participant
+        for participant in store.snapshot(board_slug).get("participants", [])
+        if participant.get("kind") == "agent" and participant.get("id") != manager_id
+    ]
+    runtime_matches = [
+        participant
+        for participant in participants
+        if any(
+            str(instance.get("id") or "") == raw_agent_id
+            for instance in participant.get("instances", [])
+        )
+    ]
+    candidates = runtime_matches or [
+        participant for participant in participants if participant.get("is_active_status")
+    ]
+    if len(candidates) != 1:
+        return "", "", ""
+    participant = candidates[0]
+    source = "existing_runtime" if runtime_matches else "sole_preactivated_role"
+    return (
+        str(participant.get("id") or ""),
+        str(participant.get("display_name") or ""),
+        source,
+    )
+
+
 def _status_for_hook(hook_name: str) -> str:
     lowered = hook_name.lower()
     if "stop" in lowered:
@@ -381,6 +415,8 @@ def main(argv: list[str] | None = None) -> int:
     project = _refresh_project_agents(store, project, server_url) or project
     hook_name = _hook_name(payload)
     agent_type = _agent_type(payload)
+    reported_agent_type = agent_type
+    binding_source = "reported_agent_type"
     participant_id, raw_agent_id = _participant_id_for_hook(
         payload,
         hook_name,
@@ -388,6 +424,14 @@ def main(argv: list[str] | None = None) -> int:
         board_slug,
         project.get("agent_profiles", []) if project else [],
     )
+    if not participant_id and "subagent" in hook_name.lower():
+        participant_id, resolved_agent_type, binding_source = _participant_for_untyped_subagent(
+            store,
+            board_slug,
+            raw_agent_id,
+        )
+        if resolved_agent_type:
+            agent_type = resolved_agent_type
     card_external_id = _explicit_card_external_id(payload)
     participant = None
     if participant_id:
@@ -403,20 +447,24 @@ def main(argv: list[str] | None = None) -> int:
         }
         if card_external_id:
             participant["current_card_external_id"] = card_external_id
+    metadata = _event_metadata(
+        payload,
+        hook_name=hook_name,
+        cwd=cwd,
+        project_slug=project["slug"] if project else "",
+        raw_agent_id=raw_agent_id,
+        agent_type=agent_type,
+    )
+    if reported_agent_type != agent_type:
+        metadata["reported_agent_type"] = reported_agent_type
+        metadata["binding_source"] = binding_source
     event = {
         "board_slug": board_slug,
         "event_type": _event_type_for_hook(hook_name),
         "participant_id": participant_id or None,
         "card_external_id": card_external_id,
         "message": agent_type,
-        "metadata": _event_metadata(
-            payload,
-            hook_name=hook_name,
-            cwd=cwd,
-            project_slug=project["slug"] if project else "",
-            raw_agent_id=raw_agent_id,
-            agent_type=agent_type,
-        ),
+        "metadata": metadata,
     }
 
     posted = False

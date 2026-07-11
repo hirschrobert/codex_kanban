@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.1.13 - 2026-07-11
+
+This release makes specialist-agent liveness resilient when Codex reports an
+untyped `default` subagent, while making exact custom-agent selection an
+explicit prerequisite for delegation.
+
+Public commits:
+
+- `0f06ea5` binds an untyped subagent to the sole pre-activated specialist role,
+  keeps ambiguous starts unbound, preserves the reported runtime type and
+  binding source, and closes the lifecycle by exact runtime ID.
+- `a165892` requires Codex Kanban delegation to select and verify the exact
+  custom-agent `name`, distinguishes agent type from `task_name`, and forbids
+  presenting a `default` agent as a named specialist whose TOML was not loaded.
+- `7249fa4` merges CK-0685 and CK-0686 into `release/0.1.13` after human
+  approval.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Restored the People live indicator for an untyped subagent when exactly one
+  board-scoped non-manager role was explicitly pre-activated.
+- Reused the existing raw runtime binding for untyped stop events so specialist
+  liveness returns to idle without guessing.
+- Recorded `reported_agent_type` and `binding_source` whenever Kanban must bind
+  an untyped runtime, while leaving ambiguous candidates unowned.
+- Required the exact Codex custom-agent type at spawn time so the intended TOML
+  instructions, permissions, model settings, and runtime identity are loaded.
+- Defined `task_name` as a task/thread label rather than an agent-type selector
+  and made missing exact-type support a visible delegation limitation.
+
+AI disclosure:
+
+This release was developed, reviewed, audited, and prepared by the main AI
+Agent Manager using the exact model `gpt-5.6-sol` (GPT-5.6 Sol). No delegated
+agent was used for this release because the active `spawn_agent` surface did
+not expose an exact custom-agent selector; substituting its `default` agent
+would not load the required specialist TOML. The work was coordinated with
+Codex Kanban checkouts `2a6ae21` for intake and implementation and `7249fa4`
+for release integration and preparation.
+
 ## 0.1.12 - 2026-07-11
 
 This release makes agent model selection follow the active Codex turn and
