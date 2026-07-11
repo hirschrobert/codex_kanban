@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from ..git_worktrees import git_worktree_context
 from ..store.support import GENERIC_AGENT_PROFILES, slugify
 
 
@@ -10,6 +11,9 @@ def repo_root(cwd: str | Path) -> Path:
     path = Path(cwd).expanduser().resolve()
     if path.is_file():
         path = path.parent
+    context = git_worktree_context(path)
+    if context:
+        return context["primary_root"]
     for candidate in [path, *path.parents]:
         if (candidate / ".git").exists():
             return candidate
@@ -65,8 +69,17 @@ def auto_register_payload(root: Path, paths: list[Path]) -> dict[str, Any]:
 
 
 def auto_register_payload_for_cwd(cwd: str | Path) -> dict[str, Any] | None:
-    root = repo_root(cwd)
-    paths = instruction_paths(root, cwd)
+    cwd_path = Path(cwd).expanduser().resolve()
+    context = git_worktree_context(cwd_path)
+    root = context["primary_root"] if context else repo_root(cwd_path)
+    instruction_cwd = cwd_path
+    if context and context["is_linked_worktree"]:
+        try:
+            relative = cwd_path.relative_to(context["worktree_root"])
+        except ValueError:
+            relative = Path()
+        instruction_cwd = root / relative
+    paths = instruction_paths(root, instruction_cwd)
     if not uses_codex_kanban(paths):
         return None
     return auto_register_payload(root, paths)

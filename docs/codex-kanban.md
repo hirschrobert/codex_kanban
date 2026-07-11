@@ -157,6 +157,30 @@ By convention, feature branches or worktrees can live under:
 $HOME/codex-worktrees
 ```
 
+Linked Git worktrees retain the identity of their primary repository. Opening
+or running an overview inside a linked worktree resolves to the project board
+registered for the primary checkout instead of registering a new project. On
+cards, use `Target Repo` for that primary checkout and `Worktree Path` for the
+checkout that contains the actual changes. The card then shows the worktree as
+its change source while remaining on the primary project's board.
+
+After the feature branch and release have landed in `main`, remove the clean
+linked worktree and record that cleanup on the card:
+
+```bash
+PYTHONPATH="$KANBAN_REPO" \
+python3 -m kanban_server.project worktree-cleanup \
+  --server-url http://127.0.0.1:8766 \
+  123
+```
+
+The cleanup command requires a done card with `target_repo`, `feature_branch`,
+and `worktree_path`. It verifies that the path is a non-primary worktree of the
+same repository, the worktree is clean, and the feature branch is an ancestor
+of `main` before running `git worktree remove`. Repeating the command after a
+successful removal is safe. Use `--merged-branch` for projects whose maintained
+integration branch has another name.
+
 Repeating cards are schedule templates. Choose `Daily`, `Weekly`, or `Monthly`
 and a `Repeat Time` in `HH:MM`; the default is `01:00` in `Europe/Berlin`.
 Repeating cards must live on an active registered project board and have

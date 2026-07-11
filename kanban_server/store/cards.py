@@ -56,7 +56,7 @@ class CardStoreMixin(_StoreMixinContract):
             self.ensure_board(board_slug, conn=conn)
             board = self._one(conn, "SELECT * FROM boards WHERE slug = ?", (board_slug,))
             boards = [dict(row) for row in conn.execute("SELECT * FROM boards ORDER BY slug")]
-            projects = self._list_projects(conn, include_removed=False)
+            projects = self._visible_projects(self._list_projects(conn, include_removed=False))
             all_projects = self._list_projects(conn, include_removed=True)
             active_project = self._project_from_row(
                 self._one(

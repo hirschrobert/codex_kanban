@@ -175,6 +175,13 @@ Register one repo with one root. Register ecosystems with repeated `--path` and
 `--instruction` values so hooks and agents can map directories to the right
 board and instructions.
 
+Linked Git worktrees belong to the project registered for their primary
+repository (the worktree reported by Git's common directory), not to separate
+projects or boards. Keep every card, participant, and event on that origin
+board. Record the primary checkout in `target_repo` and the checkout that
+actually contains the changes in `worktree_path`; the dashboard exposes the
+worktree as the card's change source without treating it as another project.
+
 Use board-scoped participants for Kanban state:
 
 - `<board>-ai-agent-manager`
@@ -283,6 +290,22 @@ review/approval. After any approved card lands on the release branch, every
 other active feature/fix branch for that release must rebase or otherwise
 refresh from the release branch and record the updated base/handoff SHA and
 checks before continuing.
+
+After the feature branch and its release have landed in `main`, remove each
+card-linked worktree with the guarded cleanup command. It preserves the
+historical `worktree_path` on the card and refuses active cards, primary
+checkouts, dirty worktrees, unrelated repositories, or branches that are not
+ancestors of `main`:
+
+```bash
+PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project worktree-cleanup \
+  --server-url "${CODEX_KANBAN_URL:-http://127.0.0.1:8766}" \
+  <numeric-card-id>
+```
+
+Use `--merged-branch <name>` only when the project's maintained integration
+branch is not `main`. Worktree cleanup is part of the post-merge handoff; do
+not leave merged card worktrees on disk indefinitely.
 
 Avoid overlapping implementation cards. Treat these as conflict signals unless
 the cards explicitly document an intentional same-user, same-topic branch share:

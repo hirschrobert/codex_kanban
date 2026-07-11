@@ -18,6 +18,7 @@ from .commands import (
     reset,
     snapshot,
     workflow_start,
+    worktree_cleanup,
 )
 
 
@@ -212,6 +213,15 @@ def main(argv: list[str] | None = None) -> int:
     comment_body.add_argument("--body")
     comment_body.add_argument("--comment", dest="body")
     card_comment_parser.set_defaults(func=card_comment)
+
+    cleanup_parser = subparsers.add_parser(
+        "worktree-cleanup",
+        help="Remove a clean card worktree after its feature branch is merged.",
+    )
+    _add_connection_arguments(cleanup_parser)
+    cleanup_parser.add_argument("card_id", type=int)
+    cleanup_parser.add_argument("--merged-branch", default="main")
+    cleanup_parser.set_defaults(func=worktree_cleanup)
 
     workflow_parser = subparsers.add_parser(
         "workflow-start",

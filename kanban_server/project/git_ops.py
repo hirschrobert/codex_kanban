@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from ..git_worktrees import git_worktree_context
 from ..store.core import KanbanStore
 from ..store.support import slugify
 from .api import _request_json
@@ -72,6 +73,95 @@ def _run_git(repo: Path, args: list[str]) -> None:
         )
     except (OSError, subprocess.CalledProcessError) as exc:
         raise ValueError(f"git {' '.join(args)} failed in {repo}") from exc
+
+
+def _git_is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo), "merge-base", "--is-ancestor", ancestor, descendant],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return False
+    return result.returncode == 0
+
+
+def _registered_worktree_paths(repo: Path) -> set[Path]:
+    output = _git_output(repo, ["worktree", "list", "--porcelain"])
+    if output is None:
+        raise ValueError(f"cannot list git worktrees from {repo}")
+    return {
+        Path(line.removeprefix("worktree ")).expanduser().resolve()
+        for line in output.splitlines()
+        if line.startswith("worktree ")
+    }
+
+
+def cleanup_merged_card_worktree(
+    card: dict[str, Any],
+    *,
+    merged_branch: str = "main",
+) -> dict[str, Any]:
+    card_label = str(card.get("external_id") or card.get("id") or "card")
+    if card.get("status") != "done":
+        raise ValueError(f"{card_label} must be done before its worktree can be removed")
+    target_repo_value = str(card.get("target_repo") or "").strip()
+    worktree_value = str(card.get("worktree_path") or "").strip()
+    feature_branch = str(card.get("feature_branch") or "").strip()
+    if not target_repo_value or not worktree_value or not feature_branch:
+        raise ValueError(
+            f"{card_label} requires target_repo, feature_branch, and worktree_path for cleanup"
+        )
+
+    target_repo = Path(target_repo_value).expanduser().resolve()
+    worktree = Path(worktree_value).expanduser().resolve()
+    target_context = git_worktree_context(target_repo)
+    if not target_context:
+        raise ValueError(f"target_repo is not a git worktree: {target_repo}")
+    primary_repo = Path(target_context["primary_root"])
+    if worktree == primary_repo:
+        raise ValueError("refusing to remove the primary repository worktree")
+
+    registered_worktrees = _registered_worktree_paths(primary_repo)
+    if worktree not in registered_worktrees:
+        if not worktree.exists():
+            return {
+                "card_id": card.get("id"),
+                "external_id": card.get("external_id"),
+                "worktree_path": str(worktree),
+                "feature_branch": feature_branch,
+                "merged_branch": merged_branch,
+                "removed": False,
+                "already_removed": True,
+            }
+        raise ValueError(f"path is not a registered worktree of {primary_repo}: {worktree}")
+
+    worktree_context = git_worktree_context(worktree)
+    if not worktree_context or worktree_context["common_dir"] != target_context["common_dir"]:
+        raise ValueError(f"worktree does not belong to target_repo: {worktree}")
+    if _git_has_uncommitted_changes(worktree):
+        raise ValueError(f"refusing to remove dirty worktree: {worktree}")
+    feature_ref = f"refs/heads/{feature_branch}"
+    merged_ref = f"refs/heads/{merged_branch}"
+    if not _git_branch_exists(primary_repo, feature_branch):
+        raise ValueError(f"feature branch does not exist: {feature_branch}")
+    if not _git_branch_exists(primary_repo, merged_branch):
+        raise ValueError(f"merged branch does not exist: {merged_branch}")
+    if not _git_is_ancestor(primary_repo, feature_ref, merged_ref):
+        raise ValueError(f"feature branch {feature_branch} is not merged into {merged_branch}")
+
+    _run_git(primary_repo, ["worktree", "remove", str(worktree)])
+    return {
+        "card_id": card.get("id"),
+        "external_id": card.get("external_id"),
+        "worktree_path": str(worktree),
+        "feature_branch": feature_branch,
+        "merged_branch": merged_branch,
+        "removed": True,
+        "already_removed": False,
+    }
 
 
 def _project_path_values(project: dict[str, Any] | None) -> list[str]:
