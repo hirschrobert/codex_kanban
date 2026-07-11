@@ -93,6 +93,28 @@ class HookAutoRegistrationTest(unittest.TestCase):
         self.assertEqual(participant_id, "demo-domain-accountant")
         self.assertEqual(raw_agent_id, "subagent-456")
 
+    def test_main_turn_uses_stable_manager_role_and_raw_runtime_id(self) -> None:
+        participant_id, raw_agent_id = hook._participant_id_for_hook(
+            {"session_id": "session-123"},
+            "UserPromptSubmit",
+            "codex-agent",
+            "demo",
+        )
+
+        self.assertEqual(participant_id, "demo-ai-agent-manager")
+        self.assertEqual(raw_agent_id, "session-123")
+
+    def test_unknown_subagent_does_not_create_a_people_row(self) -> None:
+        participant_id, raw_agent_id = hook._participant_id_for_hook(
+            {"agent_id": "agent-unknown"},
+            "SubagentStart",
+            "unregistered_agent",
+            "demo",
+        )
+
+        self.assertEqual(participant_id, "")
+        self.assertEqual(raw_agent_id, "agent-unknown")
+
     def test_subagent_context_tells_agents_to_comment_on_parent_card(self) -> None:
         message = hook._context_message(
             {
@@ -122,6 +144,7 @@ class HookAutoRegistrationTest(unittest.TestCase):
         self.assertEqual(metadata["model"], "gpt-5.6")
         self.assertEqual(metadata["session_id"], "session-123")
         self.assertEqual(metadata["turn_id"], "turn-456")
+        self.assertEqual(metadata["status"], "running")
 
     def test_event_metadata_omits_unreported_runtime_fields(self) -> None:
         metadata = hook._event_metadata(

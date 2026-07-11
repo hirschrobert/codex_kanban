@@ -69,6 +69,19 @@ class StaticAssetTest(unittest.TestCase):
         self.assertIn("affectedProjectPathText(item)", app)
         self.assertIn("Deploy: ${deploymentCount}", app)
 
+    def test_people_renderer_groups_live_instances_under_agent_roles(self) -> None:
+        app = (STATIC_DIR / "app" / "main.js").read_text(encoding="utf-8")
+        model = (STATIC_DIR / "app" / "model.js").read_text(encoding="utf-8")
+        state = (STATIC_DIR / "app" / "state.js").read_text(encoding="utf-8")
+        sidebar = (STATIC_DIR / "sidebar.css").read_text(encoding="utf-8")
+
+        self.assertIn("function agentInstanceSummary(instance)", model)
+        self.assertIn("participant.instances", app)
+        self.assertIn('class="participant-instance"', app)
+        self.assertIn("event.metadata?.model", app)
+        self.assertIn(".participant-instances", sidebar)
+        self.assertNotIn("participantLimit", state)
+
     def test_card_form_exposes_optional_intake_fields(self) -> None:
         html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
         app = (STATIC_DIR / "app" / "main.js").read_text(encoding="utf-8")

@@ -246,6 +246,16 @@ my-project-project-implementer
 my-project-project-reviewer
 ```
 
+The People panel shows these durable roles, not raw Codex thread or spawned
+agent IDs. Fresh hook events are grouped under their role as live runtime
+instances, including their authoritative status, current card/scope, and model
+when Codex reports it. Multiple concurrent instantiations of one role appear
+under that single role. A `SubagentStop` or turn `Stop` removes the instance
+from the live overview immediately; instances without a fresh event age out
+after the configured stale interval. Roles remain available and idle after all
+their instances finish, while the retained Activity events preserve the audit
+trail and per-turn model history.
+
 The backend rejects cross-board mistakes:
 
 - a card on board `B` cannot be assigned to board `A`'s agent;
