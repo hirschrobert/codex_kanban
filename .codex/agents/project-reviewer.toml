@@ -1,6 +1,5 @@
 name = "project_reviewer"
 description = "Read-only project reviewer focused on correctness, regressions, security, data integrity, release hygiene, and missing tests."
-model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Review", "Inspector", "Sentinel"]

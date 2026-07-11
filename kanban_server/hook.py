@@ -133,6 +133,31 @@ def _event_type_for_hook(hook_name: str) -> str:
     return f"hook.{lowered.replace('_', '-')}"
 
 
+def _event_metadata(
+    payload: dict[str, Any],
+    *,
+    hook_name: str,
+    cwd: str,
+    project_slug: str,
+    raw_agent_id: str,
+    agent_type: str,
+) -> dict[str, str]:
+    metadata = {
+        "hook": hook_name,
+        "cwd": cwd,
+        "project": project_slug,
+        "raw_agent_id": raw_agent_id,
+        "agent_type": agent_type,
+    }
+    runtime_fields = {
+        "model": _first_text(payload.get("model")),
+        "session_id": _first_text(payload.get("session_id"), payload.get("sessionId")),
+        "turn_id": _first_text(payload.get("turn_id"), payload.get("turnId")),
+    }
+    metadata.update({key: value for key, value in runtime_fields.items() if value})
+    return metadata
+
+
 def _post_json_result(server_url: str, path: str, payload: dict[str, Any]) -> dict[str, Any] | None:
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
@@ -260,12 +285,14 @@ def main(argv: list[str] | None = None) -> int:
         "participant_id": participant_id,
         "card_external_id": card_external_id,
         "message": agent_type,
-        "metadata": {
-            "hook": hook_name,
-            "cwd": cwd,
-            "project": project["slug"] if project else "",
-            "raw_agent_id": raw_agent_id,
-        },
+        "metadata": _event_metadata(
+            payload,
+            hook_name=hook_name,
+            cwd=cwd,
+            project_slug=project["slug"] if project else "",
+            raw_agent_id=raw_agent_id,
+            agent_type=agent_type,
+        ),
     }
 
     posted = False

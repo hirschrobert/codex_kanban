@@ -1,6 +1,5 @@
 name = "project_architect"
 description = "Read-only project architect for contracts, boundaries, release-train implications, and implementation decomposition."
-model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Architect", "Blueprint", "Surveyor"]

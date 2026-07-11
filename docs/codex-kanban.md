@@ -726,8 +726,8 @@ Reusable profiles live in `.codex/agents/` in this repository, or
 Project-specific agents can still exist, but they should not be seeded on every
 board by default. The default CI/CD flow should use these abstract profiles and
 let each repo's `AGENTS.md` provide concrete commands and constraints.
-The packaged TOML definitions for these abstract profiles use GPT-5.5 in this
-release.
+The packaged TOML definitions omit `model`, so spawned agents inherit the model
+used by the calling Codex session instead of pinning a release-specific model.
 
 For OpenAI or Codex documentation lookup, use the bundled OpenAI Docs
 skill/agent from Codex instead of registering a duplicate global profile.
@@ -747,10 +747,13 @@ as context and maps matching local subagents to board-scoped participant IDs.
 
 ## Hook Shape
 
-Codex hook configuration should call the ingester rather than writing unrelated
-local state. A user-level hook can live at `$HOME/.codex/hooks.json`
-and call `python3 -m kanban_server.hook` for `SubagentStart`,
-`SubagentStop`, and `Stop`. Codex may require reviewing/trusting that hook with
+Codex hook configuration should call the hook adapter rather than writing
+unrelated local state. A user-level hook can live at `$HOME/.codex/hooks.json`
+and call `python3 -m kanban_server.hook` for `UserPromptSubmit`,
+`SubagentStart`, `SubagentStop`, and `Stop`. Codex includes the active `model`
+in every hook payload and includes `turn_id` on turn-scoped hooks, so the
+adapter records the actual model for each turn even when the user changes
+models during one session. Codex may require reviewing/trusting that hook with
 `/hooks` before it runs.
 
 A project-local hook can be based on this shape after review/trust:
@@ -758,6 +761,16 @@ A project-local hook can be based on this shape after review/trust:
 ```json
 {
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -d \"${CODEX_KANBAN_REPO:?Set CODEX_KANBAN_REPO to the codex_kanban checkout}/kanban_server\" && CODEX_KANBAN_URL=http://127.0.0.1:8766 PYTHONPATH=\"$CODEX_KANBAN_REPO\" python3 -m kanban_server.hook"
+          }
+        ]
+      }
+    ],
     "SubagentStart": [
       {
         "hooks": [
@@ -773,7 +786,17 @@ A project-local hook can be based on this shape after review/trust:
         "hooks": [
           {
             "type": "command",
-            "command": "CODEX_KANBAN_URL=http://127.0.0.1:8766 python3 -m kanban_server.ingest --event-type subagent.stopped --participant-kind agent --status done --message SubagentStop"
+            "command": "test -d \"${CODEX_KANBAN_REPO:?Set CODEX_KANBAN_REPO to the codex_kanban checkout}/kanban_server\" && CODEX_KANBAN_URL=http://127.0.0.1:8766 PYTHONPATH=\"$CODEX_KANBAN_REPO\" python3 -m kanban_server.hook"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -d \"${CODEX_KANBAN_REPO:?Set CODEX_KANBAN_REPO to the codex_kanban checkout}/kanban_server\" && CODEX_KANBAN_URL=http://127.0.0.1:8766 PYTHONPATH=\"$CODEX_KANBAN_REPO\" python3 -m kanban_server.hook"
           }
         ]
       }

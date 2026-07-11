@@ -105,6 +105,38 @@ class HookAutoRegistrationTest(unittest.TestCase):
         self.assertIn("parent coordination card", message)
         self.assertIn("findings, decisions, blockers, and next steps", message)
 
+    def test_event_metadata_records_the_model_for_each_turn(self) -> None:
+        metadata = hook._event_metadata(
+            {
+                "model": "gpt-5.6",
+                "session_id": "session-123",
+                "turn_id": "turn-456",
+            },
+            hook_name="UserPromptSubmit",
+            cwd="/workspace/demo",
+            project_slug="demo",
+            raw_agent_id="session-123",
+            agent_type="codex-agent",
+        )
+
+        self.assertEqual(metadata["model"], "gpt-5.6")
+        self.assertEqual(metadata["session_id"], "session-123")
+        self.assertEqual(metadata["turn_id"], "turn-456")
+
+    def test_event_metadata_omits_unreported_runtime_fields(self) -> None:
+        metadata = hook._event_metadata(
+            {},
+            hook_name="SubagentStart",
+            cwd="/workspace/demo",
+            project_slug="demo",
+            raw_agent_id="agent-123",
+            agent_type="project_reviewer",
+        )
+
+        self.assertNotIn("model", metadata)
+        self.assertNotIn("session_id", metadata)
+        self.assertNotIn("turn_id", metadata)
+
 
 if __name__ == "__main__":
     unittest.main()
