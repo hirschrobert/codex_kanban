@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import io
+import json
+import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from kanban_server import hook
 from kanban_server.store import KanbanStore
@@ -93,6 +98,28 @@ class HookAutoRegistrationTest(unittest.TestCase):
         self.assertEqual(participant_id, "demo-domain-accountant")
         self.assertEqual(raw_agent_id, "subagent-456")
 
+    def test_main_turn_uses_stable_manager_role_and_raw_runtime_id(self) -> None:
+        participant_id, raw_agent_id = hook._participant_id_for_hook(
+            {"session_id": "session-123"},
+            "UserPromptSubmit",
+            "codex-agent",
+            "demo",
+        )
+
+        self.assertEqual(participant_id, "demo-ai-agent-manager")
+        self.assertEqual(raw_agent_id, "session-123")
+
+    def test_unknown_subagent_does_not_create_a_people_row(self) -> None:
+        participant_id, raw_agent_id = hook._participant_id_for_hook(
+            {"agent_id": "agent-unknown"},
+            "SubagentStart",
+            "unregistered_agent",
+            "demo",
+        )
+
+        self.assertEqual(participant_id, "")
+        self.assertEqual(raw_agent_id, "agent-unknown")
+
     def test_subagent_context_tells_agents_to_comment_on_parent_card(self) -> None:
         message = hook._context_message(
             {
@@ -104,6 +131,128 @@ class HookAutoRegistrationTest(unittest.TestCase):
 
         self.assertIn("parent coordination card", message)
         self.assertIn("findings, decisions, blockers, and next steps", message)
+
+    def test_event_metadata_records_the_model_for_each_turn(self) -> None:
+        metadata = hook._event_metadata(
+            {
+                "model": "gpt-5.6",
+                "session_id": "session-123",
+                "turn_id": "turn-456",
+            },
+            hook_name="UserPromptSubmit",
+            cwd="/workspace/demo",
+            project_slug="demo",
+            raw_agent_id="session-123",
+            agent_type="codex-agent",
+        )
+
+        self.assertEqual(metadata["model"], "gpt-5.6")
+        self.assertEqual(metadata["session_id"], "session-123")
+        self.assertEqual(metadata["turn_id"], "turn-456")
+        self.assertEqual(metadata["status"], "running")
+
+    def test_event_metadata_omits_unreported_runtime_fields(self) -> None:
+        metadata = hook._event_metadata(
+            {},
+            hook_name="SubagentStart",
+            cwd="/workspace/demo",
+            project_slug="demo",
+            raw_agent_id="agent-123",
+            agent_type="project_reviewer",
+        )
+
+        self.assertNotIn("model", metadata)
+        self.assertNotIn("session_id", metadata)
+        self.assertNotIn("turn_id", metadata)
+
+    def test_hook_installer_adds_prompt_start_and_preserves_unrelated_hooks(self) -> None:
+        existing = {
+            "hooks": {
+                "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "other-tool"}]}],
+                "Stop": [
+                    {
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": "OLD=1 python3 -m kanban_server.hook",
+                            }
+                        ]
+                    }
+                ],
+            }
+        }
+
+        merged = hook._merged_user_hooks(
+            existing,
+            repo=Path("/workspace/codex-kanban"),
+            server_url="http://127.0.0.1:8766",
+        )
+
+        for event_name in hook.KANBAN_HOOK_EVENTS:
+            groups = merged["hooks"][event_name]
+            kanban_groups = [group for group in groups if hook._is_kanban_hook_group(group)]
+            self.assertEqual(len(kanban_groups), 1, event_name)
+            command = kanban_groups[0]["hooks"][0]["command"]
+            if event_name != "Stop":
+                self.assertIn(f"CODEX_HOOK_EVENT={event_name}", command)
+        self.assertEqual(
+            merged["hooks"]["UserPromptSubmit"][0], existing["hooks"]["UserPromptSubmit"][0]
+        )
+        self.assertEqual(merged["hooks"]["Stop"][0], existing["hooks"]["Stop"][0])
+
+    def test_user_prompt_and_stop_drive_main_runtime_lifecycle(self) -> None:
+        store = self.make_store()
+        root = self.make_repo(
+            "## Codex Kanban\n\n- You must use the `codex-kanban` skill to coordinate work.\n"
+        )
+        store.register_project(
+            {
+                "slug": "new-project",
+                "display_name": "New Project",
+                "board_slug": "new-project",
+                "card_prefix": "NEW",
+                "root_path": str(root),
+            }
+        )
+        environment = {
+            "CODEX_KANBAN_DB": str(store.db_path),
+            "CODEX_KANBAN_URL": "",
+        }
+        prompt_payload = {
+            "hook_event_name": "UserPromptSubmit",
+            "cwd": str(root),
+            "model": "gpt-5.6-terra",
+            "session_id": "session-123",
+            "turn_id": "turn-1",
+        }
+        with (
+            patch.dict(os.environ, environment, clear=False),
+            patch.object(sys, "stdin", io.StringIO(json.dumps(prompt_payload))),
+        ):
+            self.assertEqual(hook.main([]), 0)
+
+        manager = next(
+            participant
+            for participant in KanbanStore(store.db_path).snapshot("new-project")["participants"]
+            if participant["id"] == "new-project-ai-agent-manager"
+        )
+        self.assertEqual(manager["status"], "running")
+        self.assertEqual(manager["instances"][0]["model"], "gpt-5.6-terra")
+
+        stop_payload = dict(prompt_payload, hook_event_name="Stop", turn_id="turn-1")
+        with (
+            patch.dict(os.environ, environment, clear=False),
+            patch.object(sys, "stdin", io.StringIO(json.dumps(stop_payload))),
+        ):
+            self.assertEqual(hook.main([]), 0)
+
+        manager = next(
+            participant
+            for participant in KanbanStore(store.db_path).snapshot("new-project")["participants"]
+            if participant["id"] == "new-project-ai-agent-manager"
+        )
+        self.assertEqual(manager["status"], "idle")
+        self.assertEqual(manager["instances"], [])
 
 
 if __name__ == "__main__":

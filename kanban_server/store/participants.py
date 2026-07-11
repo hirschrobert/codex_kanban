@@ -5,12 +5,17 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from .support import (
+    ACTIVE_PARTICIPANT_STATUSES,
     DEFAULT_ACTIVITY_EVENT_LIMIT,
+    DEFAULT_AI_AGENT_MANAGER_SUFFIX,
     EVENT_RETENTION_HOURS,
     PARTICIPANT_KINDS,
+    STALE_AFTER_SECONDS,
     _json_dumps,
+    _json_loads,
     _normalise_comment_author_name,
     _normalise_metadata,
+    agent_profile_id,
     slugify,
     utc_now,
 )
@@ -24,6 +29,166 @@ else:
 
 
 class ParticipantEventStoreMixin(_StoreMixinContract):
+    def _participants_with_runtime(
+        self,
+        conn: sqlite3.Connection,
+        rows: list[sqlite3.Row],
+        *,
+        board_slug: str,
+        active_project: dict[str, Any] | None,
+        now: datetime,
+    ) -> list[dict[str, Any]]:
+        role_ids: set[str] | None = None
+        if active_project:
+            role_ids = {
+                slugify(f"{board_slug}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}"),
+                *(
+                    slugify(f"{board_slug}-{agent_profile_id(profile)}")
+                    for profile in active_project.get("agent_profiles", [])
+                    if agent_profile_id(profile)
+                ),
+            }
+        participants = []
+        participants_by_id: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            participant = self._participant_from_row(row, now=now)
+            if (
+                role_ids is not None
+                and participant.get("kind") != "human"
+                and participant.get("id") not in role_ids
+            ):
+                continue
+            participant["instances"] = []
+            participant["instance_count"] = 0
+            participant["instance_status_counts"] = {}
+            participant["has_live_instances"] = False
+            participant["active_models"] = []
+            participant["active_cards"] = []
+            if participant.get("kind") == "agent":
+                participant["status"] = "idle"
+                participant["is_stale"] = False
+                participant["is_active"] = False
+            participants.append(participant)
+            participants_by_id[str(participant.get("id") or "")] = participant
+
+        cutoff = (
+            (now - timedelta(seconds=STALE_AFTER_SECONDS))
+            .isoformat(timespec="seconds")
+            .replace("+00:00", "Z")
+        )
+        runtime: dict[tuple[str, str], dict[str, Any]] = {}
+        for event_row in conn.execute(
+            """
+            SELECT * FROM events
+            WHERE board_slug = ? AND created_at >= ?
+            ORDER BY id
+            """,
+            (board_slug, cutoff),
+        ):
+            event = dict(event_row)
+            metadata = _json_loads(event.get("metadata"), {})
+            participant_id = str(event.get("participant_id") or "")
+            raw_agent_id = str(metadata.get("raw_agent_id") or "")
+            if participant_id not in participants_by_id or not raw_agent_id:
+                continue
+            status = str(metadata.get("status") or "running")
+            event_type = str(event.get("event_type") or "")
+            terminal = status in {"done", "offline"} or event_type in {
+                "subagent.stopped",
+                "subagent.finished",
+                "agent.finished",
+                "turn.stopped",
+            }
+            key = (participant_id, raw_agent_id)
+            if terminal:
+                runtime.pop(key, None)
+                continue
+            runtime[key] = {
+                "id": raw_agent_id,
+                "status": status,
+                "model": str(metadata.get("model") or ""),
+                "session_id": str(metadata.get("session_id") or ""),
+                "turn_id": str(metadata.get("turn_id") or ""),
+                "current_card_external_id": str(event.get("card_external_id") or ""),
+                "current_scope": str(metadata.get("cwd") or ""),
+                "last_seen_at": str(event.get("created_at") or ""),
+            }
+
+        status_priority = {
+            "running": 0,
+            "reviewing": 1,
+            "waiting_approval": 2,
+            "blocked": 3,
+            "waiting": 4,
+            "idle": 5,
+        }
+        for (participant_id, _), instance in runtime.items():
+            participant = participants_by_id[participant_id]
+            if participant.get("kind") == "agent":
+                participant["instances"].append(instance)
+
+        active_cards: dict[str, dict[int, dict[str, Any]]] = {}
+        for card in conn.execute(
+            """
+            SELECT id, external_id, title, status, assignee_id, owner_id
+            FROM cards
+            WHERE board_slug = ?
+              AND archived_at IS NULL
+              AND status IN ('in_progress', 'review')
+            ORDER BY updated_at DESC, id DESC
+            """,
+            (board_slug,),
+        ):
+            card_summary = {
+                "id": card["id"],
+                "external_id": card["external_id"],
+                "title": card["title"],
+                "status": card["status"],
+            }
+            for participant_id in {card["assignee_id"], card["owner_id"]} - {None, ""}:
+                if participant_id in participants_by_id:
+                    active_cards.setdefault(participant_id, {})[card["id"]] = card_summary
+        for participant in participants:
+            instances = sorted(
+                participant["instances"],
+                key=lambda item: (
+                    status_priority.get(str(item.get("status")), 99),
+                    str(item.get("last_seen_at") or ""),
+                ),
+            )
+            counts: dict[str, int] = {}
+            for instance in instances:
+                status = str(instance.get("status") or "idle")
+                counts[status] = counts.get(status, 0) + 1
+            participant["instances"] = instances
+            participant["instance_count"] = len(instances)
+            participant["instance_status_counts"] = counts
+            participant["has_live_instances"] = bool(instances)
+            participant["active_models"] = sorted(
+                {str(item.get("model")) for item in instances if item.get("model")}
+            )
+            participant["active_cards"] = list(
+                active_cards.get(str(participant.get("id") or ""), {}).values()
+            )
+            if (
+                len(instances) == 1
+                and not instances[0].get("current_card_external_id")
+                and len(participant["active_cards"]) == 1
+            ):
+                active_card = participant["active_cards"][0]
+                instances[0]["current_card_external_id"] = active_card["external_id"]
+                instances[0]["current_card_title"] = active_card["title"]
+                instances[0]["card_source"] = "unique_active_assignment"
+            if participant.get("kind") == "agent" and instances:
+                participant["status"] = str(instances[0]["status"])
+                participant["last_seen_at"] = max(
+                    str(item.get("last_seen_at") or "") for item in instances
+                )
+                participant["is_active"] = any(
+                    item.get("status") in ACTIVE_PARTICIPANT_STATUSES for item in instances
+                )
+        return participants
+
     def upsert_participant(self, payload: dict[str, Any]) -> dict[str, Any]:
         display_name = str(payload.get("display_name") or payload.get("id") or "").strip()
         participant_id = slugify(str(payload.get("id") or display_name))

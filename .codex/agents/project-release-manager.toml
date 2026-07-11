@@ -1,6 +1,5 @@
 name = "project_release_manager"
 description = "Read-only release and CI/CD integration reviewer for branches, checks, packaging, generated artifacts, and deploy readiness."
-model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Release", "Pipeline", "Harbor"]

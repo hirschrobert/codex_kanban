@@ -203,6 +203,22 @@ not to delegate material work, record or summarize the reason. The main agent
 stays responsible for routing, integration, card hygiene, and final user
 summary.
 
+Agent profiles omit `model`, so inheritance from the calling session is the
+safe default. Before each delegation, the main agent should deliberately choose
+the model strategy when the current Codex surface supports per-agent model
+selection:
+
+- inherit the current model for ambiguous implementation, architecture,
+  release, security, data-integrity, or high-risk review work;
+- request a supported lighter model for bounded, low-risk scans, triage,
+  summarization, or high-parallelism exploration when speed/cost is preferable;
+- fall back to inheritance when the spawn surface cannot select a model;
+- never infer the model from the role profile: record and display the actual
+  runtime model reported by Codex hooks.
+
+Keep model choice separate from role identity so concurrent instantiations of
+one role may use different models without creating duplicate People entries.
+
 Some Codex environments may still disallow spawning from standing repo or skill
 instructions alone. If delegation is useful but the tool is unavailable or
 disallowed, create/update the coordination cards and surface the blocker
@@ -320,8 +336,12 @@ signing, or other project-specific approval gates.
 
 Public release rules that must remain explicit:
 
-- update `CHANGELOG.md` and AI-assistance disclosure when the project requires
-  it;
+- update `CHANGELOG.md` and the AI-assistance disclosure when the project
+  requires it; when the project requires exact disclosure, record every exact
+  versioned model slug/named variant, the main or delegated roles that used it,
+  and the short, unambiguous commit SHA of the installed/running Codex Kanban
+  checkout that coordinated the release; reject base family slugs such as
+  `gpt-5` and stop rather than infer missing runtime facts;
 - audit tracked files and intended push refs for personal data, local paths,
   local databases, secrets, and generated coordination state;
 - push only explicit release branches, the approved `main` release-merge

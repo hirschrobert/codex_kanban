@@ -157,6 +157,28 @@ button.activity-row-linked {
   white-space: pre-line;
 }
 
+.participant-instances {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 5px;
+  padding-left: 2px;
+}
+
+.participant-instance {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.participant-instance .status-dot {
+  margin-top: 2px;
+}
+
 .activity-message {
   white-space: pre-line;
 }

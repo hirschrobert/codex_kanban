@@ -70,9 +70,8 @@ class CardStoreMixin(_StoreMixinContract):
                     "SELECT * FROM lanes WHERE board_slug = ? ORDER BY position", (board_slug,)
                 )
             ]
-            participants = [
-                self._participant_from_row(row, now=now)
-                for row in conn.execute(
+            participant_rows = list(
+                conn.execute(
                     """
                     SELECT * FROM participants
                     WHERE current_board_slug = ? OR current_board_slug IS NULL
@@ -92,7 +91,14 @@ class CardStoreMixin(_StoreMixinContract):
                     """,
                     (board_slug,),
                 )
-            ]
+            )
+            participants = self._participants_with_runtime(
+                conn,
+                participant_rows,
+                board_slug=board_slug,
+                active_project=active_project,
+                now=now,
+            )
             if archived_only:
                 archived_filter = "AND archived_at IS NOT NULL"
             elif include_archived:

@@ -9,7 +9,6 @@ const state = {
   draggedCardId: null,
   eventSource: null,
   showArchived: savedShowArchived,
-  participantLimit: 10,
   activityPageSize: 10,
   activityHasMore: false,
   activityLoading: false,

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
+import shlex
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -11,7 +14,112 @@ from typing import Any
 from .ingest import _post_json
 from .project.registration import auto_register_payload_for_cwd
 from .store.core import KanbanStore
-from .store.support import DEFAULT_DB_PATH, GENERIC_AGENT_PROFILES, agent_profile_id, slugify
+from .store.support import (
+    DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME,
+    DEFAULT_AI_AGENT_MANAGER_ROLE,
+    DEFAULT_AI_AGENT_MANAGER_SUFFIX,
+    DEFAULT_DB_PATH,
+    GENERIC_AGENT_PROFILES,
+    agent_profile_id,
+    slugify,
+)
+
+KANBAN_HOOK_EVENTS = ("UserPromptSubmit", "SubagentStart", "SubagentStop", "Stop")
+
+
+def _kanban_hook_group(event_name: str, *, repo: Path, server_url: str) -> dict[str, Any]:
+    environment = {
+        "CODEX_HOOK_EVENT": event_name,
+        "CODEX_KANBAN_URL": server_url,
+        "CODEX_KANBAN_REPO": str(repo),
+        "PYTHONPATH": str(repo),
+    }
+    command = " ".join(
+        [
+            *(f"{key}={shlex.quote(value)}" for key, value in environment.items()),
+            "python3 -m kanban_server.hook",
+        ]
+    )
+    group: dict[str, Any] = {
+        "hooks": [
+            {
+                "type": "command",
+                "command": command,
+                "timeout": 10,
+                "statusMessage": f"Recording {event_name} in Kanban",
+            }
+        ]
+    }
+    if event_name.startswith("Subagent"):
+        group["matcher"] = "*"
+    return group
+
+
+def _is_kanban_hook_group(group: Any) -> bool:
+    if not isinstance(group, dict):
+        return False
+    handlers = group.get("hooks")
+    if not isinstance(handlers, list):
+        return False
+    return any(
+        isinstance(handler, dict) and "kanban_server.hook" in str(handler.get("command") or "")
+        for handler in handlers
+    )
+
+
+def _merged_user_hooks(existing: dict[str, Any], *, repo: Path, server_url: str) -> dict[str, Any]:
+    result = dict(existing)
+    hooks = dict(existing.get("hooks") or {})
+    for event_name in KANBAN_HOOK_EVENTS:
+        groups = hooks.get(event_name)
+        existing_groups = list(groups) if isinstance(groups, list) else []
+        if not any(_is_kanban_hook_group(group) for group in existing_groups):
+            existing_groups.append(_kanban_hook_group(event_name, repo=repo, server_url=server_url))
+        hooks[event_name] = existing_groups
+    result["hooks"] = hooks
+    return result
+
+
+def _install_user_hooks(path: Path, *, repo: Path, server_url: str) -> Path:
+    existing: dict[str, Any] = {}
+    if path.exists():
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(parsed, dict):
+            raise ValueError(f"hook configuration must be a JSON object: {path}")
+        existing = parsed
+    merged = _merged_user_hooks(existing, repo=repo.resolve(), server_url=server_url)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as handle:
+        handle.write(json.dumps(merged, indent=2) + "\n")
+        temporary_path = Path(handle.name)
+    temporary_path.replace(path)
+    return path
+
+
+def _install_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Install Codex Kanban lifecycle hooks.")
+    parser.add_argument(
+        "--hooks-path",
+        type=Path,
+        default=Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")) / "hooks.json",
+    )
+    parser.add_argument(
+        "--repo",
+        type=Path,
+        default=Path(os.environ.get("CODEX_KANBAN_REPO") or Path(__file__).resolve().parents[1]),
+    )
+    parser.add_argument(
+        "--server-url",
+        default=os.environ.get("CODEX_KANBAN_URL", "http://127.0.0.1:8766"),
+    )
+    return parser
 
 
 def _read_hook_payload() -> dict[str, Any]:
@@ -68,6 +176,8 @@ def _agent_id(payload: dict[str, Any], agent_type: str) -> str:
         subagent.get("id"),
         payload.get("thread_id"),
         payload.get("threadId"),
+        payload.get("session_id"),
+        payload.get("sessionId"),
         agent_type,
     )
 
@@ -108,9 +218,12 @@ def _participant_id_for_hook(
     raw_agent_id = _agent_id(payload, agent_type)
     known_profiles = {agent_profile_id(profile) for profile in GENERIC_AGENT_PROFILES}
     known_profiles.update(agent_profile_id(profile) for profile in (agent_profiles or []))
-    if "subagent" in hook_name.lower() and agent_profile_id(agent_type) in known_profiles:
-        return slugify(f"{board_slug}-{agent_type}"), raw_agent_id
-    return raw_agent_id, raw_agent_id
+    if "subagent" in hook_name.lower():
+        profile_id = agent_profile_id(agent_type)
+        if profile_id in known_profiles:
+            return slugify(f"{board_slug}-{profile_id}"), raw_agent_id
+        return "", raw_agent_id
+    return slugify(f"{board_slug}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}"), raw_agent_id
 
 
 def _status_for_hook(hook_name: str) -> str:
@@ -131,6 +244,32 @@ def _event_type_for_hook(hook_name: str) -> str:
     if lowered == "stop":
         return "turn.stopped"
     return f"hook.{lowered.replace('_', '-')}"
+
+
+def _event_metadata(
+    payload: dict[str, Any],
+    *,
+    hook_name: str,
+    cwd: str,
+    project_slug: str,
+    raw_agent_id: str,
+    agent_type: str,
+) -> dict[str, str]:
+    metadata = {
+        "hook": hook_name,
+        "cwd": cwd,
+        "project": project_slug,
+        "raw_agent_id": raw_agent_id,
+        "agent_type": agent_type,
+    }
+    runtime_fields = {
+        "model": _first_text(payload.get("model")),
+        "session_id": _first_text(payload.get("session_id"), payload.get("sessionId")),
+        "turn_id": _first_text(payload.get("turn_id"), payload.get("turnId")),
+        "status": _status_for_hook(hook_name),
+    }
+    metadata.update({key: value for key, value in runtime_fields.items() if value})
+    return metadata
 
 
 def _post_json_result(server_url: str, path: str, payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -214,7 +353,16 @@ def _emit_subagent_context(hook_name: str, project: dict[str, Any] | None, board
 
 
 def main(argv: list[str] | None = None) -> int:
-    del argv
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments[:1] == ["install"]:
+        args = _install_parser().parse_args(arguments[1:])
+        installed_path = _install_user_hooks(
+            args.hooks_path,
+            repo=args.repo,
+            server_url=args.server_url,
+        )
+        print(f"Installed Codex Kanban hooks in {installed_path}")
+        return 0
     payload = _read_hook_payload()
     db_path = Path(os.environ.get("CODEX_KANBAN_DB") or DEFAULT_DB_PATH)
     server_url = os.environ.get("CODEX_KANBAN_URL", "")
@@ -241,39 +389,44 @@ def main(argv: list[str] | None = None) -> int:
         project.get("agent_profiles", []) if project else [],
     )
     card_external_id = _explicit_card_external_id(payload)
-    status = _status_for_hook(hook_name)
-
-    participant = {
-        "id": participant_id,
-        "kind": "agent" if "subagent" in hook_name.lower() else "system",
-        "display_name": agent_type,
-        "role": agent_type,
-        "status": status,
-        "board_slug": board_slug,
-        "current_scope": cwd,
-    }
-    if card_external_id:
-        participant["current_card_external_id"] = card_external_id
+    participant = None
+    if participant_id:
+        is_subagent = "subagent" in hook_name.lower()
+        participant = {
+            "id": participant_id,
+            "kind": "agent",
+            "display_name": (agent_type if is_subagent else DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME),
+            "role": agent_type if is_subagent else DEFAULT_AI_AGENT_MANAGER_ROLE,
+            "status": "idle",
+            "board_slug": board_slug,
+            "current_scope": cwd,
+        }
+        if card_external_id:
+            participant["current_card_external_id"] = card_external_id
     event = {
         "board_slug": board_slug,
         "event_type": _event_type_for_hook(hook_name),
-        "participant_id": participant_id,
+        "participant_id": participant_id or None,
         "card_external_id": card_external_id,
         "message": agent_type,
-        "metadata": {
-            "hook": hook_name,
-            "cwd": cwd,
-            "project": project["slug"] if project else "",
-            "raw_agent_id": raw_agent_id,
-        },
+        "metadata": _event_metadata(
+            payload,
+            hook_name=hook_name,
+            cwd=cwd,
+            project_slug=project["slug"] if project else "",
+            raw_agent_id=raw_agent_id,
+            agent_type=agent_type,
+        ),
     }
 
     posted = False
     if server_url:
-        _post_json(server_url, "/api/participants", participant)
+        if participant:
+            _post_json(server_url, "/api/participants", participant)
         posted = _post_json(server_url, "/api/events", event)
     if not posted:
-        store.upsert_participant(participant)
+        if participant:
+            store.upsert_participant(participant)
         store.create_event(event)
 
     _emit_subagent_context(hook_name, project, board_slug)
