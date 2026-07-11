@@ -91,7 +91,11 @@ Changes:
 AI disclosure:
 
 This release was developed, reviewed, and prepared with help from AI agents
-using GPT-5, coordinated through the Codex Kanban workflow.
+using the exact model `gpt-5` (GPT-5) for the main coordinating agent and its
+delegated implementation, review, and release agents. The work was coordinated
+with Codex Kanban commit
+`83fb4ca8bec81da60c073b356b226bf49f90dbc9`, the verified release immediately
+preceding 0.1.11.
 
 ## 0.1.10 - 2026-07-04
 

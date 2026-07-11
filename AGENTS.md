@@ -94,9 +94,17 @@ human developers, the main AI agent, and optional AI subagents.
 
 - Every release must update `CHANGELOG.md` with a concise description of the
   user-visible changes and the short commit hashes included in the release.
-- Every release changelog entry must disclose AI assistance and name the AI
-  model used by the release agents. For the 0.1.1 release, state that the
-  release was developed with help from AI agents using GPT-5.5.
+- Every release changelog entry must disclose AI assistance with exact,
+  auditable runtime details. Name every model by its exact model slug and
+  display name, identify which main/delegated agent roles used each model, and
+  record the full 40-character commit SHA of the installed or running Codex
+  Kanban checkout that coordinated the work. Family-only labels such as
+  `GPT-5` or a package version without a commit SHA are insufficient. If the
+  exact runtime model or coordination SHA cannot be established, stop release
+  preparation and record the missing evidence instead of guessing. Historical
+  disclosures may be tightened only from verified release/card/Git evidence.
+- For the 0.1.1 release, retain the historically verified GPT-5.5 disclosure;
+  do not invent a more specific slug or coordination SHA without evidence.
 - Before pushing a public release, audit tracked files and the intended push
   refs for personal data, local machine paths, local databases, secrets, and
   generated coordination state.

@@ -12,6 +12,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class PackagingTest(unittest.TestCase):
+    def test_release_instructions_require_exact_ai_disclosure_evidence(self) -> None:
+        instructions = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        skill = (ROOT / ".codex" / "skills" / "codex-kanban" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+
+        for document in (instructions, skill):
+            self.assertIn("exact", document)
+            self.assertIn("model slug", document)
+            self.assertIn("40-character commit SHA", document)
+
     def test_packaged_agent_profiles_inherit_the_session_model(self) -> None:
         profiles = sorted((ROOT / ".codex" / "agents").glob("*.toml"))
 
