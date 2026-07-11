@@ -120,6 +120,95 @@ class HookAutoRegistrationTest(unittest.TestCase):
         self.assertEqual(participant_id, "")
         self.assertEqual(raw_agent_id, "agent-unknown")
 
+    def test_untyped_subagent_binds_to_sole_preactivated_specialist(self) -> None:
+        store = self.make_store()
+        store.register_project(
+            {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "card_prefix": "DM",
+                "root_path": self.tmp.name,
+            }
+        )
+        store.upsert_participant(
+            {
+                "id": "demo-project-reviewer",
+                "kind": "agent",
+                "display_name": "project_reviewer",
+                "status": "reviewing",
+                "board_slug": "demo",
+            }
+        )
+
+        participant_id, agent_type, binding_source = hook._participant_for_untyped_subagent(
+            store, "demo", "agent-123"
+        )
+
+        self.assertEqual(participant_id, "demo-project-reviewer")
+        self.assertEqual(agent_type, "project_reviewer")
+        self.assertEqual(binding_source, "sole_preactivated_role")
+
+    def test_untyped_subagent_does_not_guess_between_active_specialists(self) -> None:
+        store = self.make_store()
+        store.register_project(
+            {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "card_prefix": "DM",
+                "root_path": self.tmp.name,
+            }
+        )
+        for profile in ("project_reviewer", "project_architect"):
+            store.upsert_participant(
+                {
+                    "id": f"demo-{profile.replace('_', '-')}",
+                    "kind": "agent",
+                    "display_name": profile,
+                    "status": "reviewing",
+                    "board_slug": "demo",
+                }
+            )
+
+        participant_id, agent_type, binding_source = hook._participant_for_untyped_subagent(
+            store, "demo", "agent-123"
+        )
+
+        self.assertEqual((participant_id, agent_type, binding_source), ("", "", ""))
+
+    def test_untyped_subagent_stop_reuses_existing_runtime_role(self) -> None:
+        store = self.make_store()
+        store.register_project(
+            {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "card_prefix": "DM",
+                "root_path": self.tmp.name,
+            }
+        )
+        store.create_event(
+            {
+                "board_slug": "demo",
+                "event_type": "subagent.started",
+                "participant_id": "demo-project-reviewer",
+                "metadata": {
+                    "raw_agent_id": "agent-123",
+                    "agent_type": "project_reviewer",
+                    "status": "running",
+                },
+            }
+        )
+
+        participant_id, agent_type, binding_source = hook._participant_for_untyped_subagent(
+            store, "demo", "agent-123"
+        )
+
+        self.assertEqual(participant_id, "demo-project-reviewer")
+        self.assertEqual(agent_type, "project_reviewer")
+        self.assertEqual(binding_source, "existing_runtime")
+
     def test_subagent_context_tells_agents_to_comment_on_parent_card(self) -> None:
         message = hook._context_message(
             {
@@ -253,6 +342,75 @@ class HookAutoRegistrationTest(unittest.TestCase):
         )
         self.assertEqual(manager["status"], "idle")
         self.assertEqual(manager["instances"], [])
+
+    def test_untyped_subagent_hooks_drive_activated_role_lifecycle(self) -> None:
+        store = self.make_store()
+        root = self.make_repo(
+            "## Codex Kanban\n\n- You must use the `codex-kanban` skill to coordinate work.\n"
+        )
+        store.register_project(
+            {
+                "slug": "new-project",
+                "display_name": "New Project",
+                "board_slug": "new-project",
+                "card_prefix": "NEW",
+                "root_path": str(root),
+            }
+        )
+        store.upsert_participant(
+            {
+                "id": "new-project-project-reviewer",
+                "kind": "agent",
+                "display_name": "project_reviewer",
+                "status": "reviewing",
+                "board_slug": "new-project",
+            }
+        )
+        environment = {
+            "CODEX_KANBAN_DB": str(store.db_path),
+            "CODEX_KANBAN_URL": "",
+        }
+        start_payload = {
+            "hook_event_name": "SubagentStart",
+            "cwd": str(root),
+            "agent_type": "default",
+            "agent_id": "agent-123",
+            "model": "gpt-5.6-terra",
+        }
+        with (
+            patch.dict(os.environ, environment, clear=False),
+            patch.object(sys, "stdin", io.StringIO(json.dumps(start_payload))),
+            patch("sys.stdout", new_callable=io.StringIO),
+        ):
+            self.assertEqual(hook.main([]), 0)
+
+        reviewer = next(
+            participant
+            for participant in KanbanStore(store.db_path).snapshot("new-project")["participants"]
+            if participant["id"] == "new-project-project-reviewer"
+        )
+        self.assertEqual(reviewer["status"], "running")
+        self.assertEqual(reviewer["instances"][0]["id"], "agent-123")
+        start_event = KanbanStore(store.db_path).snapshot("new-project")["events"][-1]
+        self.assertEqual(start_event["metadata"]["reported_agent_type"], "default")
+        self.assertEqual(start_event["metadata"]["binding_source"], "sole_preactivated_role")
+
+        stop_payload = dict(start_payload, hook_event_name="SubagentStop")
+        with (
+            patch.dict(os.environ, environment, clear=False),
+            patch.object(sys, "stdin", io.StringIO(json.dumps(stop_payload))),
+        ):
+            self.assertEqual(hook.main([]), 0)
+
+        reviewer = next(
+            participant
+            for participant in KanbanStore(store.db_path).snapshot("new-project")["participants"]
+            if participant["id"] == "new-project-project-reviewer"
+        )
+        self.assertEqual(reviewer["status"], "idle")
+        self.assertEqual(reviewer["instances"], [])
+        stop_event = KanbanStore(store.db_path).snapshot("new-project")["events"][-1]
+        self.assertEqual(stop_event["metadata"]["binding_source"], "existing_runtime")
 
 
 if __name__ == "__main__":
