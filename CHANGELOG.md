@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.1.15 - 2026-07-11
+
+This release reduces realtime snapshot amplification across concurrent project
+boards, gives agents and the dashboard a recent-work-first card view, and adds
+a confirmed one-click archive action for completed cards older than two days.
+
+Public commits:
+
+- `fab2d51` replaces full-snapshot SSE fan-out with coalesced board-change
+  notifications, makes polling reconnect-only, omits old done cards from the
+  default snapshot and overview, and adds the bulk archive workflow.
+- `b443484` merges CK-0716, CK-0720, and CK-0721 into `release/0.1.15` after
+  human approval.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Sent lightweight, board-scoped SSE invalidations after writes and coalesced
+  browser refreshes instead of serializing a complete snapshot for every
+  lifecycle event.
+- Used periodic snapshot polling only while EventSource is reconnecting and
+  suppressed global broadcasts for unchanged project registration.
+- Kept active cards and done cards updated within the last two days in default
+  snapshot and startup-overview responses, with cutoff and hidden-count
+  metadata plus explicit complete-history options.
+- Added a board-scoped `Archive done >2d` shortcut that previews exact
+  candidates, requires confirmation, revalidates card IDs, archives only
+  eligible cards, and records one auditable bulk event.
+- Updated the Codex Kanban skill to direct agents toward a small initial
+  overview and deliberate history retrieval.
+
+AI disclosure:
+
+This release was developed, reviewed, audited, and prepared by the main AI
+Agent Manager using the exact model `gpt-5.6-sol` (GPT-5.6 Sol). No delegated
+agent was used; the main agent selected serial execution for the cohesive live
+delivery, card-history, archive, integration, and deployment scope. The work
+was coordinated by the installed and running Codex Kanban checkout `b5123c6`.
+
 ## 0.1.14 - 2026-07-11
 
 This release keeps linked Git worktrees on their origin project board, adds

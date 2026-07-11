@@ -32,9 +32,10 @@ For command details and longer examples, see `docs/codex-kanban.md`.
 3. Refresh board-scoped AI agents from current generic defaults and
    discoverable project-local profiles. The startup overview command below does
    this and updates the dashboard people/assignee lists.
-4. Inspect a lean non-archived card overview before work. Human-added cards
-   are authoritative unless the user redirects the task. Remember archived
-   cards may exist and may need a separate archived search for older context.
+4. Inspect a lean non-archived card overview before work. Its default first
+   peek keeps active cards and done cards updated within the last two days;
+   deliberately request older done or archived history only when the task needs
+   it. Human-added cards are authoritative unless the user redirects the task.
 5. Select the relevant card or create one if none fits. For implementation
    work, confirm the card has a target release branch and an appropriate
    feature/fix branch before editing files. Prefer reusing an unmerged branch
@@ -104,8 +105,9 @@ PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project overview \
 ```
 
 Use full `snapshot` only when you need events, participants, comments, or
-archived-inclusive board state. Use `--done-limit -1` only when completed-card
-history is needed; first overview should keep done-card history short. If the
+archived-inclusive board state. Both default snapshot and overview omit done
+cards older than two days. Use `--done-limit -1` only when complete done-card
+history is needed; search archived cards separately. If the
 human asks to reload the `codex-kanban` skill, rerun the overview command so
 current generic/default and project-local agents are synced into the UI.
 

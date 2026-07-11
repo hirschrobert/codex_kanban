@@ -96,6 +96,9 @@ def snapshot(args: argparse.Namespace) -> int:
             "board": args.board,
             "include_archived": "1" if args.include_archived else None,
             "archived_only": "1" if args.archived_only else None,
+            "include_old_done": (
+                "1" if args.done_limit is not None and args.done_limit < 0 else None
+            ),
         }.items()
         if value
     }
@@ -113,6 +116,7 @@ def snapshot(args: argparse.Namespace) -> int:
         args.board or None,
         include_archived=args.include_archived,
         archived_only=args.archived_only,
+        include_old_done=args.done_limit is not None and args.done_limit < 0,
     )
     _print_json(_limit_snapshot_done_cards(result, args.done_limit))
     return 0
@@ -129,6 +133,7 @@ def overview(args: argparse.Namespace) -> int:
             "done_limit": str(args.done_limit),
             "include_archived": "1" if args.include_archived else None,
             "archived_only": "1" if args.archived_only else None,
+            "include_old_done": "1" if args.done_limit < 0 else None,
             "register_if_missing": "1" if args.register_if_missing else None,
         }.items()
         if value
@@ -151,6 +156,7 @@ def overview(args: argparse.Namespace) -> int:
         archived_only=args.archived_only,
         limit=args.limit,
         done_limit=args.done_limit,
+        include_old_done=args.done_limit < 0,
     )
     if (
         args.register_if_missing
@@ -173,6 +179,7 @@ def overview(args: argparse.Namespace) -> int:
                     archived_only=args.archived_only,
                     limit=args.limit,
                     done_limit=args.done_limit,
+                    include_old_done=args.done_limit < 0,
                 ),
                 "registered_project": result["registered_project"],
             }

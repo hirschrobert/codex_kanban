@@ -558,6 +558,61 @@ class KanbanStoreTest(unittest.TestCase):
         self.assertTrue(result["deleted"])
         self.assertIsNone(store.get_card(card["id"]))
 
+    def test_default_snapshot_hides_old_done_cards_until_explicitly_requested(self) -> None:
+        store = self.make_store()
+        old_done = store.create_card(
+            {"title": "Old completion", "description": "Keep as history.", "status": "done"}
+        )
+        recent_done = store.create_card(
+            {"title": "Recent completion", "description": "Show initially.", "status": "done"}
+        )
+        with store._connect() as conn:
+            conn.execute(
+                "UPDATE cards SET created_at = ?, updated_at = ? WHERE id = ?",
+                ("2020-01-01T00:00:00Z", "2020-01-01T00:00:00Z", old_done["id"]),
+            )
+
+        default = store.snapshot()
+        history = store.snapshot(include_old_done=True)
+
+        self.assertNotIn(old_done["id"], [card["id"] for card in default["cards"]])
+        self.assertIn(recent_done["id"], [card["id"] for card in default["cards"]])
+        self.assertEqual(default["old_done_cards_hidden_count"], 1)
+        self.assertIn(old_done["id"], [card["id"] for card in history["cards"]])
+
+    def test_bulk_archive_only_targets_old_unarchived_done_cards(self) -> None:
+        store = self.make_store()
+        old_done = store.create_card(
+            {"title": "Archive old", "description": "Done long ago.", "status": "done"}
+        )
+        recent_done = store.create_card(
+            {"title": "Keep recent", "description": "Done recently.", "status": "done"}
+        )
+        active = store.create_card(
+            {"title": "Keep active", "description": "Still active.", "status": "in_progress"}
+        )
+        with store._connect() as conn:
+            conn.execute(
+                "UPDATE cards SET created_at = ?, updated_at = ? WHERE id IN (?, ?)",
+                (
+                    "2020-01-01T00:00:00Z",
+                    "2020-01-01T00:00:00Z",
+                    old_done["id"],
+                    active["id"],
+                ),
+            )
+
+        result = store.archive_old_done_cards("default")
+
+        self.assertEqual(result["card_ids"], [old_done["id"]])
+        archived_card = store.get_card(old_done["id"])
+        recent_card = store.get_card(recent_done["id"])
+        active_card = store.get_card(active["id"])
+        assert archived_card is not None and recent_card is not None and active_card is not None
+        self.assertTrue(archived_card["archived"])
+        self.assertFalse(recent_card["archived"])
+        self.assertFalse(active_card["archived"])
+
     def test_multiline_text_normalizes_literal_newline_markers(self) -> None:
         store = self.make_store()
         card = store.create_card(

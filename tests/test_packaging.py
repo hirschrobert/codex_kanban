@@ -88,6 +88,7 @@ class PackagingTest(unittest.TestCase):
             "kanban_server/static/index.html",
             "kanban_server/static/app/main.js",
             "kanban_server/static/app/project-settings.js",
+            "kanban_server/static/app/archive-old.js",
             "kanban_server/static/styles.css",
         ]:
             self.assertIn(asset, names)
