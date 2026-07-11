@@ -20,8 +20,9 @@ class PackagingTest(unittest.TestCase):
 
         for document in (instructions, skill):
             self.assertIn("exact", document)
-            self.assertIn("model slug", document)
-            self.assertIn("40-character commit SHA", document)
+            self.assertIn("versioned model slug", document)
+            self.assertIn("short, unambiguous commit SHA", document)
+            self.assertIn("gpt-5", document)
 
     def test_packaged_agent_profiles_inherit_the_session_model(self) -> None:
         profiles = sorted((ROOT / ".codex" / "agents").glob("*.toml"))
