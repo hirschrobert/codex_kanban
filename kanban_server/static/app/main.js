@@ -48,6 +48,7 @@ const liveStateEl = document.querySelector("#live-state");
 const projectSelectEl = document.querySelector("#project-select");
 const showArchivedToggleEl = document.querySelector("#show-archived-toggle");
 const archiveActionButton = document.querySelector("#archive-action-button");
+const archiveOldDoneButton = document.querySelector("#archive-old-done-button");
 const versionTagEl = document.querySelector("#version-tag");
 const cardDialog = document.querySelector("#card-dialog");
 const cardForm = document.querySelector("#card-form");
@@ -72,6 +73,9 @@ const projectSettings = window.KanbanProjectSettings.createProjectSettingsContro
   refresh,
   connectEvents,
   escapeHtml,
+});
+const archiveOld = window.KanbanArchiveOld.createController({
+  api, state, button: archiveOldDoneButton, refresh,
 });
 
 function setLiveState(label, className) {
@@ -125,6 +129,7 @@ function render(snapshot) {
   }
   renderProjectSelect();
   showArchivedToggleEl.checked = state.showArchived;
+  archiveOldDoneButton.disabled = state.showArchived;
   renderVersionTag(snapshot.app);
   renderBoard();
   renderArchiveAction();
@@ -813,6 +818,10 @@ function connectEvents() {
   if (state.eventSource) {
     state.eventSource.close();
   }
+  if (state.fallbackPollTimer) {
+    clearInterval(state.fallbackPollTimer);
+    state.fallbackPollTimer = null;
+  }
   const params = new URLSearchParams();
   if (state.board) params.set("board", state.board);
   if (state.showArchived) params.set("archived_only", "1");
@@ -820,9 +829,24 @@ function connectEvents() {
   const path = suffix ? `/api/events/stream?${suffix}` : "/api/events/stream";
   const events = new EventSource(path);
   state.eventSource = events;
-  events.addEventListener("open", () => setLiveState("Live", "connected"));
+  events.addEventListener("open", () => {
+    if (state.fallbackPollTimer) {
+      clearInterval(state.fallbackPollTimer);
+      state.fallbackPollTimer = null;
+    }
+    setLiveState("Live", "connected");
+  });
   events.addEventListener("snapshot", (event) => render(JSON.parse(event.data)));
-  events.addEventListener("error", () => setLiveState("Reconnecting", "offline"));
+  events.addEventListener("change", () => {
+    clearTimeout(state.refreshTimer);
+    state.refreshTimer = setTimeout(() => refresh().catch(console.error), 150);
+  });
+  events.addEventListener("error", () => {
+    setLiveState("Reconnecting", "offline");
+    if (!state.fallbackPollTimer) {
+      state.fallbackPollTimer = setInterval(() => refresh().catch(console.error), 10000);
+    }
+  });
 }
 
 async function loadMoreActivityEvents() {
@@ -871,7 +895,6 @@ async function switchProject(event) {
   resetActivityPaging();
   clearArchiveSelections();
   setLiveState("Switching", "");
-  await refresh();
   connectEvents();
 }
 
@@ -880,7 +903,6 @@ async function toggleArchived(event) {
   localStorage.setItem("codex-kanban-show-archived", state.showArchived ? "1" : "0");
   resetActivityPaging();
   clearArchiveSelections();
-  await refresh();
   connectEvents();
 }
 
@@ -930,6 +952,7 @@ document.querySelector("#new-participant-button").addEventListener("click", () =
 document.querySelector("#settings-button").addEventListener("click", () => projectSettings.openSettingsDialog());
 showArchivedToggleEl.addEventListener("change", toggleArchived);
 archiveActionButton.addEventListener("click", applyArchiveAction);
+archiveOldDoneButton.addEventListener("click", archiveOld.archiveOldDone);
 deleteCardButton.addEventListener("click", deleteCurrentCard);
 runCardNowButton.addEventListener("click", () => runCardNow());
 addCommentButton.addEventListener("click", addCurrentComment);
@@ -954,10 +977,5 @@ cardForm.addEventListener("submit", saveCard);
 participantForm.addEventListener("submit", saveParticipant);
 loadActivityOnScroll(activityEl);
 
-refresh().then(connectEvents).catch((error) => {
-  setLiveState("Offline", "offline");
-  console.error(error);
-});
-
-setInterval(refresh, 10000);
+connectEvents();
 })();

@@ -109,7 +109,7 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help=(
             "Maximum done cards to include in the snapshot. "
-            "Omit to preserve the full snapshot, use 0 to hide done cards, "
+            "Omit for the recent two-day view, use 0 to hide recent done cards, "
             "or -1 to include all done cards explicitly."
         ),
     )

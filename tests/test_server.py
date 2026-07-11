@@ -77,6 +77,25 @@ class ServerDefaultsTest(unittest.TestCase):
         self.assertEqual(server.DEFAULT_PORT, 8766)
         self.assertNotEqual(server.DEFAULT_PORT, 8765)
 
+    def test_unchanged_project_registration_does_not_broadcast(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = KanbanStore(Path(tmp) / "kanban.sqlite3")
+            httpd = self.start_server(store)
+            payload: dict[str, object] = {
+                "slug": "demo",
+                "display_name": "Demo",
+                "board_slug": "demo",
+                "root_path": "/tmp/demo",
+            }
+            with mock.patch.object(httpd.broker, "publish_change") as publish:
+                self.request_json(httpd, "/api/projects", payload)
+                self.assertTrue(publish.called)
+                publish.reset_mock()
+
+                self.request_json(httpd, "/api/projects", payload)
+
+                publish.assert_not_called()
+
     def test_main_prints_friendly_message_when_port_is_in_use(self) -> None:
         stderr = io.StringIO()
         error = OSError(errno.EADDRINUSE, "Address already in use")
@@ -850,6 +869,45 @@ class ServerDefaultsTest(unittest.TestCase):
             self.assertTrue(any(item["id"] == active["id"] for item in shown["cards"]))
             self.assertTrue(any(item["id"] == card["id"] for item in archived_only["cards"]))
             self.assertFalse(any(item["id"] == active["id"] for item in archived_only["cards"]))
+
+    def test_bulk_archive_old_done_endpoint_previews_confirms_and_broadcasts_once(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = KanbanStore(Path(tmp) / "kanban.sqlite3")
+            httpd = self.start_server(store)
+            card = store.create_card(
+                {
+                    "board_slug": "demo",
+                    "title": "Old done card",
+                    "description": "Archive through shortcut.",
+                    "status": "done",
+                }
+            )
+            with store._connect() as conn:
+                conn.execute(
+                    "UPDATE cards SET created_at = ?, updated_at = ? WHERE id = ?",
+                    ("2020-01-01T00:00:00Z", "2020-01-01T00:00:00Z", card["id"]),
+                )
+
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{httpd.server_address[1]}"
+                "/api/cards/archive-candidates?board=demo&older_than_days=2",
+                timeout=3,
+            ) as response:
+                preview = json.loads(response.read().decode("utf-8"))
+            status, result = self.request_json(
+                httpd,
+                "/api/cards/archive-old-done",
+                {"board_slug": "demo", "older_than_days": 2},
+            )
+
+            self.assertEqual(preview["count"], 1)
+            self.assertEqual(status, 200)
+            self.assertEqual(result["card_ids"], [card["id"]])
+            updated = store.get_card(card["id"])
+            assert updated is not None
+            self.assertTrue(updated["archived"])
+            events = store.list_events("demo", limit=10)["events"]
+            self.assertEqual(events[-1]["event_type"], "cards.archived_bulk")
 
     def test_overview_resolves_workspace_and_reports_archived_hint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

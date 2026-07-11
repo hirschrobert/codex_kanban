@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from .support import (
     ACTIVE_CARD_STATUSES,
     CARD_TEXT_FIELDS,
     DEFAULT_ACTIVITY_EVENT_LIMIT,
+    DEFAULT_DONE_LOOKBACK_DAYS,
     DEFAULT_REPEAT_TIME,
     DEFAULT_REPEAT_TIMEZONE,
     JSON_LIST_FIELDS,
@@ -41,6 +42,7 @@ class CardStoreMixin(_StoreMixinContract):
         *,
         include_archived: bool = False,
         archived_only: bool = False,
+        include_old_done: bool = False,
     ) -> dict[str, Any]:
         with self._lock, self._connect() as conn:
             now = datetime.now(UTC)
@@ -106,6 +108,27 @@ class CardStoreMixin(_StoreMixinContract):
                 archived_filter = ""
             else:
                 archived_filter = "AND archived_at IS NULL"
+            cutoff = self._format_utc(now - timedelta(days=DEFAULT_DONE_LOOKBACK_DAYS))
+            old_done_filter = ""
+            params: list[Any] = [board_slug]
+            if not include_old_done and not include_archived and not archived_only:
+                old_done_filter = """
+                    AND (
+                        status != 'done'
+                        OR COALESCE(NULLIF(updated_at, ''), created_at) >= ?
+                    )
+                """
+                params.append(cutoff)
+            old_done_row = self._one(
+                conn,
+                """
+                SELECT COUNT(*) AS count FROM cards
+                WHERE board_slug = ? AND archived_at IS NULL AND status = 'done'
+                  AND COALESCE(NULLIF(updated_at, ''), created_at) < ?
+                """,
+                (board_slug, cutoff),
+            )
+            old_done_count = int(old_done_row["count"] if old_done_row else 0)
             cards = [
                 self._card_from_row(row)
                 for row in conn.execute(
@@ -113,12 +136,13 @@ class CardStoreMixin(_StoreMixinContract):
                     SELECT * FROM cards
                     WHERE board_slug = ?
                       {archived_filter}
+                      {old_done_filter}
                     ORDER BY
                         archived_at IS NOT NULL,
                         COALESCE(NULLIF(updated_at, ''), created_at) DESC,
                         id DESC
                     """,
-                    (board_slug,),
+                    params,
                 )
             ]
             self._attach_dependency_links(conn, cards)
@@ -148,6 +172,20 @@ class CardStoreMixin(_StoreMixinContract):
                 },
                 "lanes": lanes,
                 "cards": cards,
+                "done_lookback_days": DEFAULT_DONE_LOOKBACK_DAYS,
+                "done_cutoff": cutoff,
+                "old_done_cards_hidden_count": (
+                    old_done_count
+                    if not include_old_done and not include_archived and not archived_only
+                    else 0
+                ),
+                "old_done_cards_hidden": bool(
+                    old_done_count
+                    and not include_old_done
+                    and not include_archived
+                    and not archived_only
+                ),
+                "include_old_done": include_old_done,
                 "participants": participants,
                 "events": event_page["events"],
                 "events_has_more": event_page["has_more"],

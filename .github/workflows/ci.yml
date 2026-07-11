@@ -40,6 +40,7 @@ jobs:
           node --check kanban_server/static/app/api.js
           node --check kanban_server/static/app/model.js
           node --check kanban_server/static/app/project-settings.js
+          node --check kanban_server/static/app/archive-old.js
           node --check kanban_server/static/app/main.js
 
       - name: Compile Python
