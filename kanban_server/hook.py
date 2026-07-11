@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
+import shlex
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -20,6 +23,103 @@ from .store.support import (
     agent_profile_id,
     slugify,
 )
+
+KANBAN_HOOK_EVENTS = ("UserPromptSubmit", "SubagentStart", "SubagentStop", "Stop")
+
+
+def _kanban_hook_group(event_name: str, *, repo: Path, server_url: str) -> dict[str, Any]:
+    environment = {
+        "CODEX_HOOK_EVENT": event_name,
+        "CODEX_KANBAN_URL": server_url,
+        "CODEX_KANBAN_REPO": str(repo),
+        "PYTHONPATH": str(repo),
+    }
+    command = " ".join(
+        [
+            *(f"{key}={shlex.quote(value)}" for key, value in environment.items()),
+            "python3 -m kanban_server.hook",
+        ]
+    )
+    group: dict[str, Any] = {
+        "hooks": [
+            {
+                "type": "command",
+                "command": command,
+                "timeout": 10,
+                "statusMessage": f"Recording {event_name} in Kanban",
+            }
+        ]
+    }
+    if event_name.startswith("Subagent"):
+        group["matcher"] = "*"
+    return group
+
+
+def _is_kanban_hook_group(group: Any) -> bool:
+    if not isinstance(group, dict):
+        return False
+    handlers = group.get("hooks")
+    if not isinstance(handlers, list):
+        return False
+    return any(
+        isinstance(handler, dict) and "kanban_server.hook" in str(handler.get("command") or "")
+        for handler in handlers
+    )
+
+
+def _merged_user_hooks(existing: dict[str, Any], *, repo: Path, server_url: str) -> dict[str, Any]:
+    result = dict(existing)
+    hooks = dict(existing.get("hooks") or {})
+    for event_name in KANBAN_HOOK_EVENTS:
+        groups = hooks.get(event_name)
+        existing_groups = list(groups) if isinstance(groups, list) else []
+        if not any(_is_kanban_hook_group(group) for group in existing_groups):
+            existing_groups.append(_kanban_hook_group(event_name, repo=repo, server_url=server_url))
+        hooks[event_name] = existing_groups
+    result["hooks"] = hooks
+    return result
+
+
+def _install_user_hooks(path: Path, *, repo: Path, server_url: str) -> Path:
+    existing: dict[str, Any] = {}
+    if path.exists():
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(parsed, dict):
+            raise ValueError(f"hook configuration must be a JSON object: {path}")
+        existing = parsed
+    merged = _merged_user_hooks(existing, repo=repo.resolve(), server_url=server_url)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as handle:
+        handle.write(json.dumps(merged, indent=2) + "\n")
+        temporary_path = Path(handle.name)
+    temporary_path.replace(path)
+    return path
+
+
+def _install_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Install Codex Kanban lifecycle hooks.")
+    parser.add_argument(
+        "--hooks-path",
+        type=Path,
+        default=Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")) / "hooks.json",
+    )
+    parser.add_argument(
+        "--repo",
+        type=Path,
+        default=Path(os.environ.get("CODEX_KANBAN_REPO") or Path(__file__).resolve().parents[1]),
+    )
+    parser.add_argument(
+        "--server-url",
+        default=os.environ.get("CODEX_KANBAN_URL", "http://127.0.0.1:8766"),
+    )
+    return parser
 
 
 def _read_hook_payload() -> dict[str, Any]:
@@ -253,7 +353,16 @@ def _emit_subagent_context(hook_name: str, project: dict[str, Any] | None, board
 
 
 def main(argv: list[str] | None = None) -> int:
-    del argv
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments[:1] == ["install"]:
+        args = _install_parser().parse_args(arguments[1:])
+        installed_path = _install_user_hooks(
+            args.hooks_path,
+            repo=args.repo,
+            server_url=args.server_url,
+        )
+        print(f"Installed Codex Kanban hooks in {installed_path}")
+        return 0
     payload = _read_hook_payload()
     db_path = Path(os.environ.get("CODEX_KANBAN_DB") or DEFAULT_DB_PATH)
     server_url = os.environ.get("CODEX_KANBAN_URL", "")

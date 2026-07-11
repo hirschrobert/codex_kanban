@@ -738,6 +738,13 @@ board by default. The default CI/CD flow should use these abstract profiles and
 let each repo's `AGENTS.md` provide concrete commands and constraints.
 The packaged TOML definitions omit `model`, so spawned agents inherit the model
 used by the calling Codex session instead of pinning a release-specific model.
+Inheritance is the default, not a requirement: when the active Codex surface
+supports per-agent selection, the main agent may request a supported lighter
+model for bounded low-risk scans, triage, or summarization while retaining the
+current stronger model for ambiguous implementation, architecture, release,
+security, and data-integrity work. People reports the actual hook-supplied
+runtime model for each live instantiation and summarizes all active models on
+the stable role row.
 
 For OpenAI or Codex documentation lookup, use the bundled OpenAI Docs
 skill/agent from Codex instead of registering a duplicate global profile.
@@ -814,3 +821,17 @@ A project-local hook can be based on this shape after review/trust:
   }
 }
 ```
+
+Install or refresh the same four lifecycle hooks at user scope with:
+
+```bash
+PYTHONPATH="$CODEX_KANBAN_REPO" python3 -m kanban_server.hook install \
+  --repo "$CODEX_KANBAN_REPO" \
+  --server-url "${CODEX_KANBAN_URL:-http://127.0.0.1:8766}"
+```
+
+The installer preserves unrelated handlers and already installed Codex Kanban
+handlers so existing trust records remain stable, and adds missing lifecycle
+events. Review/trust the new `UserPromptSubmit` hook with
+`/hooks`; start a new Codex session if the current client does not reload hook
+configuration dynamically.

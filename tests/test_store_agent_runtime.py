@@ -132,6 +132,76 @@ class AgentRuntimeSnapshotTest(unittest.TestCase):
         self.assertEqual(json.loads(row["metadata"])["model"], "gpt-5.6-terra")
         self.assertEqual(role["instances"][0]["model"], "gpt-5.6-terra")
 
+    def test_prompt_before_card_intake_late_binds_unique_active_card(self) -> None:
+        store = self.make_store()
+        store.create_event(
+            {
+                "board_slug": "demo",
+                "event_type": "hook.userpromptsubmit",
+                "participant_id": "demo-ai-agent-manager",
+                "metadata": {
+                    "raw_agent_id": "session-1",
+                    "status": "running",
+                    "model": "gpt-5.6",
+                },
+            }
+        )
+        card = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Live work",
+                "description": "Created after the user prompt hook.",
+                "status": "in_progress",
+                "assignee_id": "demo-ai-agent-manager",
+                "target_branch": "release/1.0.0",
+            }
+        )
+
+        manager = next(
+            item
+            for item in store.snapshot("demo")["participants"]
+            if item["id"] == "demo-ai-agent-manager"
+        )
+
+        self.assertEqual(manager["active_models"], ["gpt-5.6"])
+        self.assertEqual(manager["active_cards"][0]["external_id"], card["external_id"])
+        self.assertEqual(manager["instances"][0]["current_card_external_id"], card["external_id"])
+        self.assertEqual(manager["instances"][0]["card_source"], "unique_active_assignment")
+
+    def test_multiple_active_cards_or_instances_are_not_guessed(self) -> None:
+        store = self.make_store()
+        for raw_id in ("session-1", "session-2"):
+            store.create_event(
+                {
+                    "board_slug": "demo",
+                    "event_type": "hook.userpromptsubmit",
+                    "participant_id": "demo-ai-agent-manager",
+                    "metadata": {"raw_agent_id": raw_id, "status": "running"},
+                }
+            )
+        for title in ("First", "Second"):
+            store.create_card(
+                {
+                    "board_slug": "demo",
+                    "title": title,
+                    "description": "Ambiguous live work.",
+                    "status": "in_progress",
+                    "assignee_id": "demo-ai-agent-manager",
+                    "target_branch": "release/1.0.0",
+                }
+            )
+
+        manager = next(
+            item
+            for item in store.snapshot("demo")["participants"]
+            if item["id"] == "demo-ai-agent-manager"
+        )
+
+        self.assertEqual(len(manager["active_cards"]), 2)
+        self.assertTrue(
+            all(not instance["current_card_external_id"] for instance in manager["instances"])
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
