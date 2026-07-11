@@ -163,13 +163,9 @@ class ProjectStoreMixin(_StoreMixinContract):
             root_path = str(project.get("root_path") or "").strip()
             context = git_worktree_context(root_path) if root_path else None
             primary_owner = candidate_paths.get(str(context["primary_root"])) if context else None
-            if (
-                context
-                and context["is_linked_worktree"]
-                and primary_owner
-                and primary_owner != project.get("slug")
-            ):
-                continue
+            if context and context["is_linked_worktree"]:
+                if primary_owner and primary_owner != project.get("slug"):
+                    continue
             visible.append(project)
         return visible
 
@@ -345,10 +341,9 @@ class ProjectStoreMixin(_StoreMixinContract):
             if not str(path).strip():
                 continue
             query_path = Path(path).expanduser().resolve()
-            query_key = str(query_path)
-            if query_key in seen_query_paths:
+            if str(query_path) in seen_query_paths:
                 continue
-            seen_query_paths.add(query_key)
+            seen_query_paths.add(str(query_path))
             query_paths.append(query_path)
         with self._lock, self._connect() as conn:
             projects = self._visible_projects(self._list_projects(conn, include_removed=False))
