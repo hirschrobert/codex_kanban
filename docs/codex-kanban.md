@@ -95,9 +95,10 @@ agent defaults or project agents change.
 
 The primary intake path is conversational: a human gives a feature request,
 error report, or release concern to the main AI agent for the project. The main
-agent records the request as one or more cards, chooses the relevant
-board-scoped participants, and then coordinates implementation, review, CI, and
-release-readiness handoffs through the board.
+agent records the request as one or more cards and independently decides
+whether built-in agents, custom agents, optional board profiles, or no
+delegation best fit. Kanban records the resulting implementation, review, CI,
+and release-readiness handoffs.
 
 Direct dashboard entry is optional. It is useful when a human wants to seed a
 card without starting an agent session yet, but it is not required for normal
@@ -244,13 +245,16 @@ board-scoped participant identities such as:
 ```text
 my-project-project-implementer
 my-project-project-reviewer
+my-project-codex-subagents
 ```
 
-The People panel shows these durable roles, not raw Codex thread or spawned
-agent IDs. Fresh hook events are grouped under their role as live runtime
-instances, including their authoritative status, current card/scope, and model
-when Codex reports it. Multiple concurrent instantiations of one role appear
-under that single role. A `SubagentStop` or turn `Stop` removes the instance
+The People panel shows durable roles with live runtime instances. Registered
+custom-agent types are grouped under their exact board profile. Codex built-ins
+such as `default`, `worker`, and `explorer`, plus unregistered custom types, are
+grouped under `codex-subagents`; each instance still shows the actual reported
+agent type, raw runtime ID, status, current card/scope, and model when Codex
+reports it. Multiple concurrent instantiations of one role appear under that
+single role. A `SubagentStop` or turn `Stop` removes the instance
 from the live overview immediately; instances without a fresh event age out
 after the configured stale interval. Roles remain available and idle after all
 their instances finish, while the retained Activity events preserve the audit
@@ -343,14 +347,10 @@ Put this durable instruction in a new project's `AGENTS.md`:
 
 - Use the `codex-kanban` skill for concrete feature, fix, docs, test, review,
   release, registration, or multi-agent work in this repository.
-- Treat Codex Kanban as a standing instruction to consider specialized
-  subagents at session start and before material implementation, review,
-  release-readiness, documentation, audit, domain, contract, architecture, or
-  test-strategy work. Use them when they can improve software quality,
-  usability, safety, maintainability, or data integrity. Choose relevant
-  specialists from all available board-scoped profiles, including project-local
-  profiles, instead of spawning every profile by default, and explain why
-  delegation was used or skipped.
+- Leave delegation and agent selection to the main Codex agent. Board-scoped
+  profiles are optional specialists alongside Codex built-ins, other custom
+  agents, and single-agent execution; Kanban use alone does not require
+  delegation or a justification for skipping it.
 - Treat different user requests, implementation scopes, and agents as separate
   contributors in cards and comments. Same-user local follow-ups that continue
   the same object or cohesive topic may share the existing unmerged branch, with
@@ -676,17 +676,10 @@ Participating AI agents should:
 - split multi-intent human requests into separate cards before implementation:
   one feature plus one fix, different affected apps, different user roles, or
   independent deployment scopes should not share one implementation card;
-- treat Codex Kanban as a standing instruction to consider specialized
-  subagents at session start and before material implementation, review,
-  release-readiness, documentation, audit, domain, contract, architecture, or
-  test-strategy work. Use them when they can improve software quality,
-  usability, safety, maintainability, or data integrity. Choose the smallest
-  useful set from all available board-scoped profiles, including project-local
-  profiles, instead of spawning every profile by default, and explain why
-  delegation was used or skipped;
-- start review automatically after implementation cards complete when a
-  delegation mechanism is available. The implementation agent should not leave a
-  reviewer card merely `ready` unless no reviewer can be started;
+- let the main Codex agent decide whether delegation helps and whether built-in,
+  custom, board-scoped, or no subagents best fit; profiles are optional offers;
+- when review is delegated, let the main agent select the best available agent
+  and track material review work without forcing a specific board profile;
 - continue rejected reviews automatically: reviewer findings create or reopen a
   repair card for `project_implementer`, repair completion starts re-review, and
   the loop repeats until formal specs, checks, and acceptance criteria pass;

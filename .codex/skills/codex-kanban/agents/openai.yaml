@@ -1,4 +1,4 @@
 interface:
   display_name: "Codex Kanban"
-  short_description: "Coordinate cards, agents, and handoffs"
-  default_prompt: "Use $codex-kanban to coordinate this project through the Kanban board, including card status, scoped subagent delegation, isolated card branches, and handoffs."
+  short_description: "Coordinate cards, people, and handoffs"
+  default_prompt: "Use $codex-kanban to coordinate project cards, visible contributors, branches, checks, and auditable handoffs."

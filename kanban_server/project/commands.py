@@ -354,14 +354,14 @@ PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project register \\
 
 After registration, use board `{slug}` as the shared orchestration surface.
 Use the `codex-kanban` skill to respect human-added cards, work only on the
-assigned card/scope, and treat Codex Kanban as a standing project instruction
-to actively consider specialized subagents at session start and before material
-implementation, review, release-readiness, documentation, audit, domain,
-contract, architecture, or test-strategy work. Use them when they can improve
-software quality, usability, safety, maintainability, or data integrity. Choose
-the smallest relevant set from all available board-scoped profiles, including
-project-local profiles: {profiles}. Do not spawn every profile by default, and
-explain why delegation was used or skipped.
+assigned card/scope, and keep delegation under the main Codex agent's control.
+Board-scoped profiles are optional task-specific offers alongside Codex built-in
+agents, other custom agents, and single-agent execution. Available project-local
+and generic profiles: {profiles}. Using Kanban does not require delegation or a
+justification for skipping it. When a registered profile is deliberately chosen,
+select its exact custom-agent type so Codex loads the matching configuration;
+native or otherwise unregistered agents remain visible under the board-scoped
+Codex subagents People role with their reported runtime type.
 When delegated work produces findings, decisions, blockers, or completion
 results, add a concise card comment to the parent coordination card so the
 topic context stays with the parent card, not only with a child card or chat.
@@ -390,10 +390,6 @@ contributors. Each feature/fix implementation card needs its own card-specific
 branch with commits before handoff. Merge it to the release branch only after
 human final review, then rebase or refresh remaining active feature/fix
 branches from that release branch.
-If a Codex environment still disallows spawning from standing project
-instructions alone, record the intended delegation cards and surface the blocker
-instead of silently doing delegated work in the parent context.
-
 Concrete project rules stay in this repo's AGENTS.md; do not copy domain rules
 into the global Kanban app.
 """)

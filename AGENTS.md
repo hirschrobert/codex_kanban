@@ -16,19 +16,19 @@ human developers, the main AI agent, and optional AI subagents.
   contains independent features, fixes, affected apps/repos, user roles, UI
   flows, or deployment scopes, create separate sibling cards or a coordination
   parent with child cards instead of one bundled implementation card.
-- Treat Codex Kanban as a standing project instruction for the first/main AI
-  agent to actively consider specialized subagents at session start and before
-  each material implementation, review, release, documentation, or audit step.
-  Use them more consequently when they can improve software quality, usability,
-  safety, maintainability, or data integrity. Do not spawn every available
-  profile by default; choose the smallest relevant set from the board-scoped
-  participants and explain the delegation reason or why delegation was skipped.
-- For concrete multi-agent work, create one parent coordination card plus one
-  linked child for the main implementer and each delegated subagent doing
-  material work. Assign children to board-scoped participants and record
-  start/finish/handoff on those child cards. If the active Codex environment
-  still disallows spawning, record the cards and surface the blocker instead of
-  silently folding delegated work into the parent agent.
+- Leave delegation decisions to the first/main AI agent. Board-scoped profiles
+  are optional task-specific offers alongside Codex built-in agents, other
+  custom agents, and single-agent execution; using Codex Kanban does not by
+  itself require delegation or a written justification for skipping it.
+- Observe every spawned subagent in the People field. Bind a deliberately
+  selected board profile only when Codex reports that exact custom-agent type;
+  keep built-in or otherwise unregistered types under the board-scoped Codex
+  subagents runtime role and preserve their reported type.
+- For concrete multi-agent work with material, independently tracked scopes,
+  create one parent coordination card plus linked children for contributors
+  whose execution needs its own branch, worktree, checks, or handoff. Ephemeral
+  exploration and support agents may remain runtime-only when a separate card
+  would add no durable coordination value.
 - Treat different user requests, implementation scopes, and agents as separate
   contributors in the cards, but do not force a new branch when the human's
   local follow-up request continues the same object, UI surface, domain concept,
