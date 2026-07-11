@@ -320,8 +320,11 @@ signing, or other project-specific approval gates.
 
 Public release rules that must remain explicit:
 
-- update `CHANGELOG.md` and AI-assistance disclosure when the project requires
-  it;
+- update `CHANGELOG.md` and the AI-assistance disclosure when the project
+  requires it; when the project requires exact disclosure, record every exact
+  model slug/display name, the main or delegated roles that used it, and the
+  full 40-character commit SHA of the installed/running Codex Kanban checkout
+  that coordinated the release; stop rather than infer missing runtime facts;
 - audit tracked files and intended push refs for personal data, local paths,
   local databases, secrets, and generated coordination state;
 - push only explicit release branches, the approved `main` release-merge

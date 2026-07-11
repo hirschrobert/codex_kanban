@@ -12,6 +12,8 @@ const {
   dateTimeLabel,
   participantName,
   participantKind,
+  agentInstanceName,
+  agentInstanceSummary,
   commentAuthorName,
   cardById,
   relatedCardsForEvent,
@@ -341,19 +343,34 @@ function renderCard(card) {
 
 function renderParticipants() {
   const participants = state.snapshot?.participants || [];
-  const visibleParticipants = participants.slice(0, state.participantLimit);
   participantsEl.innerHTML = "";
-  visibleParticipants.forEach((participant) => {
+  participants.forEach((participant) => {
     const row = document.createElement("button");
     row.type = "button";
     row.className = `participant-row ghost-button ${participant.is_stale ? "stale" : ""}`;
     const dotClass = participant.is_stale ? "status-stale" : `status-${participant.status}`;
-    const liveness = participant.is_stale ? "stale" : participant.is_active ? "active" : participant.status;
+    const instances = Array.isArray(participant.instances) ? participant.instances : [];
+    const liveness = instances.length
+      ? `${instances.length} live instance${instances.length === 1 ? "" : "s"}`
+      : participant.is_stale
+        ? "stale"
+        : participant.status;
+    const instanceRows = instances
+      .map(
+        (instance) => `
+          <span class="participant-instance">
+            <span class="status-dot status-${escapeHtml(instance.status || "idle")}"></span>
+            <span><strong>${escapeHtml(agentInstanceName(instance))}</strong> · ${escapeHtml(agentInstanceSummary(instance))}</span>
+          </span>
+        `
+      )
+      .join("");
     row.innerHTML = `
       <span class="status-dot ${dotClass}"></span>
       <span class="participant-main">
         <span class="participant-name">${escapeHtml(participant.display_name)}</span>
-        <span class="participant-role">${escapeHtml(liveness)} · ${escapeHtml(participant.role || participant.kind)} · ${timeAgo(participant.last_seen_at)}</span>
+        <span class="participant-role">${escapeHtml(liveness)} · ${escapeHtml(participant.role || participant.kind)}</span>
+        ${instanceRows ? `<span class="participant-instances">${instanceRows}</span>` : ""}
       </span>
     `;
     row.addEventListener("click", () => openParticipantDialog(participant));
@@ -371,6 +388,7 @@ function renderActivity() {
     const row = document.createElement("button");
     const relatedCards = relatedCardsForEvent(event);
     const cardSummary = relatedCardSummary(relatedCards);
+    const runtime = [event.metadata?.model, event.metadata?.turn_id].filter(Boolean).join(" · ");
     row.type = "button";
     row.className = `activity-row ${relatedCards.length ? "activity-row-linked" : ""}`;
     row.disabled = !relatedCards.length;
@@ -379,7 +397,7 @@ function renderActivity() {
       <span class="status-dot"></span>
       <span class="activity-main">
         <span class="activity-message">${escapeHtml(event.event_type)} ${escapeHtml(normalizeNewlines(event.message || ""))}</span>
-        <span class="activity-meta">${escapeHtml(normalizeNewlines(event.card_external_id || ""))} ${escapeHtml(event.participant_id || "")} ${timeAgo(event.created_at)}${cardSummary ? ` · ${escapeHtml(cardSummary)}` : ""}</span>
+        <span class="activity-meta">${escapeHtml(normalizeNewlines(event.card_external_id || ""))} ${escapeHtml(event.participant_id || "")} ${timeAgo(event.created_at)}${runtime ? ` · ${escapeHtml(runtime)}` : ""}${cardSummary ? ` · ${escapeHtml(cardSummary)}` : ""}</span>
       </span>
     `;
     if (relatedCards.length) {
@@ -830,7 +848,6 @@ function loadActivityOnScroll(element) {
 async function switchProject(event) {
   state.board = event.target.value;
   localStorage.setItem("codex-kanban-board", state.board);
-  state.participantLimit = 10;
   resetActivityPaging();
   clearArchiveSelections();
   setLiveState("Switching", "");
@@ -879,17 +896,6 @@ async function applyArchiveAction() {
   }
 }
 
-function loadMoreOnScroll(element, stateKey, totalGetter, renderFn) {
-  element.addEventListener("scroll", () => {
-    const nearEnd = element.scrollTop + element.clientHeight >= element.scrollHeight - 12;
-    if (!nearEnd) return;
-    const total = totalGetter();
-    if (state[stateKey] >= total) return;
-    state[stateKey] += 10;
-    renderFn();
-  });
-}
-
 function escapeHtml(value) {
   return text(value)
     .replaceAll("&", "&amp;")
@@ -926,12 +932,6 @@ protectDialogCancel(participantDialog, participantForm);
 projectSelectEl.addEventListener("change", switchProject);
 cardForm.addEventListener("submit", saveCard);
 participantForm.addEventListener("submit", saveParticipant);
-loadMoreOnScroll(
-  participantsEl,
-  "participantLimit",
-  () => (state.snapshot?.participants || []).length,
-  renderParticipants
-);
 loadActivityOnScroll(activityEl);
 
 refresh().then(connectEvents).catch((error) => {

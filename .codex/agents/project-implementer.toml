@@ -1,6 +1,5 @@
 name = "project_implementer"
 description = "Generic implementation worker for bounded project work with explicit card scope and file ownership."
-model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 nickname_candidates = ["Builder", "Implementer", "Patch"]

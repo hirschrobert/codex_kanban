@@ -52,6 +52,22 @@ window.Kanban = window.Kanban || {};
     return participant ? participant.kind : "human";
   }
 
+  function agentInstanceName(instance) {
+    const id = text(instance?.id, "agent");
+    return id.length > 18 ? `…${id.slice(-12)}` : id;
+  }
+
+  function agentInstanceSummary(instance) {
+    return [
+      text(instance?.status, "idle"),
+      normalText(instance?.model),
+      normalText(instance?.current_card_external_id),
+      timeAgo(instance?.last_seen_at),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
   function commentAuthorName(comment) {
     const authorName = comment.author_name || comment.participant_id || "Unknown";
     if (legacyLocalCommentAuthorNames.has(authorName.toLowerCase())) {
@@ -339,6 +355,8 @@ window.Kanban = window.Kanban || {};
     dateTimeLabel,
     participantName,
     participantKind,
+    agentInstanceName,
+    agentInstanceSummary,
     commentAuthorName,
     cardById,
     relatedCardsForEvent,

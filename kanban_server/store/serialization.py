@@ -81,6 +81,7 @@ class SerializationCoordinationMixin(_StoreMixinContract):
         card.setdefault("assignee", None)
         card.setdefault("assignee_is_active", False)
         card.setdefault("assignee_is_stale", False)
+        card.setdefault("assignee_has_live_instances", False)
         return card
 
     def _attach_affected_project_paths(
@@ -380,15 +381,23 @@ class SerializationCoordinationMixin(_StoreMixinContract):
             "seconds_since_seen": participant.get("seconds_since_seen"),
             "is_active": participant.get("is_active"),
             "is_stale": participant.get("is_stale"),
+            "has_live_instances": participant.get("has_live_instances"),
+            "instance_count": participant.get("instance_count", 0),
         }
         card["assignee_is_active"] = bool(participant.get("is_active"))
         card["assignee_is_stale"] = bool(participant.get("is_stale"))
+        card["assignee_has_live_instances"] = bool(participant.get("has_live_instances"))
 
         if card.get("status") not in ACTIVE_CARD_STATUSES:
             return
         if participant.get("kind") != "agent":
             return
-        if participant.get("is_stale"):
+        if not participant.get("has_live_instances"):
+            card["coordination_warnings"].append(
+                "Assigned agent role has no live instantiation; "
+                "start or reassign it before assuming work is active."
+            )
+        elif participant.get("is_stale"):
             seconds = participant.get("seconds_since_seen")
             age = self._human_age(seconds) if isinstance(seconds, int) else "unknown time"
             card["coordination_warnings"].append(

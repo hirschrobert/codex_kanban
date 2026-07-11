@@ -11,7 +11,15 @@ from typing import Any
 from .ingest import _post_json
 from .project.registration import auto_register_payload_for_cwd
 from .store.core import KanbanStore
-from .store.support import DEFAULT_DB_PATH, GENERIC_AGENT_PROFILES, agent_profile_id, slugify
+from .store.support import (
+    DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME,
+    DEFAULT_AI_AGENT_MANAGER_ROLE,
+    DEFAULT_AI_AGENT_MANAGER_SUFFIX,
+    DEFAULT_DB_PATH,
+    GENERIC_AGENT_PROFILES,
+    agent_profile_id,
+    slugify,
+)
 
 
 def _read_hook_payload() -> dict[str, Any]:
@@ -68,6 +76,8 @@ def _agent_id(payload: dict[str, Any], agent_type: str) -> str:
         subagent.get("id"),
         payload.get("thread_id"),
         payload.get("threadId"),
+        payload.get("session_id"),
+        payload.get("sessionId"),
         agent_type,
     )
 
@@ -108,9 +118,12 @@ def _participant_id_for_hook(
     raw_agent_id = _agent_id(payload, agent_type)
     known_profiles = {agent_profile_id(profile) for profile in GENERIC_AGENT_PROFILES}
     known_profiles.update(agent_profile_id(profile) for profile in (agent_profiles or []))
-    if "subagent" in hook_name.lower() and agent_profile_id(agent_type) in known_profiles:
-        return slugify(f"{board_slug}-{agent_type}"), raw_agent_id
-    return raw_agent_id, raw_agent_id
+    if "subagent" in hook_name.lower():
+        profile_id = agent_profile_id(agent_type)
+        if profile_id in known_profiles:
+            return slugify(f"{board_slug}-{profile_id}"), raw_agent_id
+        return "", raw_agent_id
+    return slugify(f"{board_slug}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}"), raw_agent_id
 
 
 def _status_for_hook(hook_name: str) -> str:
@@ -131,6 +144,32 @@ def _event_type_for_hook(hook_name: str) -> str:
     if lowered == "stop":
         return "turn.stopped"
     return f"hook.{lowered.replace('_', '-')}"
+
+
+def _event_metadata(
+    payload: dict[str, Any],
+    *,
+    hook_name: str,
+    cwd: str,
+    project_slug: str,
+    raw_agent_id: str,
+    agent_type: str,
+) -> dict[str, str]:
+    metadata = {
+        "hook": hook_name,
+        "cwd": cwd,
+        "project": project_slug,
+        "raw_agent_id": raw_agent_id,
+        "agent_type": agent_type,
+    }
+    runtime_fields = {
+        "model": _first_text(payload.get("model")),
+        "session_id": _first_text(payload.get("session_id"), payload.get("sessionId")),
+        "turn_id": _first_text(payload.get("turn_id"), payload.get("turnId")),
+        "status": _status_for_hook(hook_name),
+    }
+    metadata.update({key: value for key, value in runtime_fields.items() if value})
+    return metadata
 
 
 def _post_json_result(server_url: str, path: str, payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -241,39 +280,44 @@ def main(argv: list[str] | None = None) -> int:
         project.get("agent_profiles", []) if project else [],
     )
     card_external_id = _explicit_card_external_id(payload)
-    status = _status_for_hook(hook_name)
-
-    participant = {
-        "id": participant_id,
-        "kind": "agent" if "subagent" in hook_name.lower() else "system",
-        "display_name": agent_type,
-        "role": agent_type,
-        "status": status,
-        "board_slug": board_slug,
-        "current_scope": cwd,
-    }
-    if card_external_id:
-        participant["current_card_external_id"] = card_external_id
+    participant = None
+    if participant_id:
+        is_subagent = "subagent" in hook_name.lower()
+        participant = {
+            "id": participant_id,
+            "kind": "agent",
+            "display_name": (agent_type if is_subagent else DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME),
+            "role": agent_type if is_subagent else DEFAULT_AI_AGENT_MANAGER_ROLE,
+            "status": "idle",
+            "board_slug": board_slug,
+            "current_scope": cwd,
+        }
+        if card_external_id:
+            participant["current_card_external_id"] = card_external_id
     event = {
         "board_slug": board_slug,
         "event_type": _event_type_for_hook(hook_name),
-        "participant_id": participant_id,
+        "participant_id": participant_id or None,
         "card_external_id": card_external_id,
         "message": agent_type,
-        "metadata": {
-            "hook": hook_name,
-            "cwd": cwd,
-            "project": project["slug"] if project else "",
-            "raw_agent_id": raw_agent_id,
-        },
+        "metadata": _event_metadata(
+            payload,
+            hook_name=hook_name,
+            cwd=cwd,
+            project_slug=project["slug"] if project else "",
+            raw_agent_id=raw_agent_id,
+            agent_type=agent_type,
+        ),
     }
 
     posted = False
     if server_url:
-        _post_json(server_url, "/api/participants", participant)
+        if participant:
+            _post_json(server_url, "/api/participants", participant)
         posted = _post_json(server_url, "/api/events", event)
     if not posted:
-        store.upsert_participant(participant)
+        if participant:
+            store.upsert_participant(participant)
         store.create_event(event)
 
     _emit_subagent_context(hook_name, project, board_slug)
