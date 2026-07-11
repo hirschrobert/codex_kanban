@@ -59,6 +59,7 @@ window.Kanban = window.Kanban || {};
 
   function agentInstanceSummary(instance) {
     return [
+      normalText(instance?.agent_type),
       text(instance?.status, "idle"),
       normalText(instance?.model),
       normalText(instance?.current_card_external_id),

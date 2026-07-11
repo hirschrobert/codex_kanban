@@ -12,6 +12,13 @@ STATIC_DIR = Path(__file__).resolve().parents[1] / "kanban_server" / "static"
 
 
 class StaticAssetTest(unittest.TestCase):
+    def test_cards_show_worktree_change_source(self) -> None:
+        app = (STATIC_DIR / "app" / "main.js").read_text(encoding="utf-8")
+
+        self.assertIn("change_source", app)
+        self.assertIn("Changes sourced from worktree", app)
+        self.assertIn("Worktree:", app)
+
     def test_dashboard_scripts_load_in_dependency_order(self) -> None:
         html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
         scripts = [
@@ -76,6 +83,8 @@ class StaticAssetTest(unittest.TestCase):
         sidebar = (STATIC_DIR / "sidebar.css").read_text(encoding="utf-8")
 
         self.assertIn("function agentInstanceSummary(instance)", model)
+        self.assertIn("normalText(instance?.agent_type)", model)
+        self.assertIn("Focused:", app)
         self.assertIn("participant.instances", app)
         self.assertIn('class="participant-instance"', app)
         self.assertIn("event.metadata?.model", app)

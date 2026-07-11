@@ -10,6 +10,7 @@ from ..store.core import KanbanStore
 from ..store.support import slugify
 from .api import _patch_json, _post_json, _print_json, _request_json
 from .due import due_run as due_run
+from .git_ops import cleanup_merged_card_worktree
 from .payloads import (
     _agent_profiles,
     _card_comment_payload,
@@ -291,6 +292,49 @@ def participant_upsert(args: argparse.Namespace) -> int:
     return 0
 
 
+def worktree_cleanup(args: argparse.Namespace) -> int:
+    card = None
+    if args.server_url:
+        card = _request_json(args.server_url, f"/api/cards/{args.card_id}")
+    store = KanbanStore(args.db)
+    if card is None:
+        card = store.get_card(args.card_id)
+    if card is None:
+        raise KeyError(f"card {args.card_id} not found")
+
+    result = cleanup_merged_card_worktree(card, merged_branch=args.merged_branch)
+    outcome = "already removed" if result["already_removed"] else "removed"
+    check = (
+        f"Worktree {result['worktree_path']} {outcome} after "
+        f"{result['feature_branch']} merged into {result['merged_branch']}."
+    )
+    checks = [*card.get("checks", [])]
+    if check not in checks:
+        checks.append(check)
+    dispositions = [*card.get("deployment_dispositions", [])]
+    cleanup_disposition = {
+        "label": "worktree cleanup",
+        "path": result["worktree_path"],
+        "status": "removed",
+        "note": f"feature branch merged into {result['merged_branch']}",
+    }
+    dispositions = [
+        item
+        for item in dispositions
+        if not (isinstance(item, dict) and item.get("label") == "worktree cleanup")
+    ]
+    dispositions.append(cleanup_disposition)
+    update = {"checks": checks, "deployment_dispositions": dispositions}
+    if args.server_url:
+        updated = _patch_json(args.server_url, f"/api/cards/{args.card_id}", update)
+    else:
+        updated = None
+    if updated is None:
+        updated = store.update_card(args.card_id, update)
+    _print_json({**result, "card": updated})
+    return 0
+
+
 def workflow_start(args: argparse.Namespace) -> int:
     payload = _workflow_payload(args)
     if args.server_url:
@@ -354,14 +398,14 @@ PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.project register \\
 
 After registration, use board `{slug}` as the shared orchestration surface.
 Use the `codex-kanban` skill to respect human-added cards, work only on the
-assigned card/scope, and treat Codex Kanban as a standing project instruction
-to actively consider specialized subagents at session start and before material
-implementation, review, release-readiness, documentation, audit, domain,
-contract, architecture, or test-strategy work. Use them when they can improve
-software quality, usability, safety, maintainability, or data integrity. Choose
-the smallest relevant set from all available board-scoped profiles, including
-project-local profiles: {profiles}. Do not spawn every profile by default, and
-explain why delegation was used or skipped.
+assigned card/scope, and keep delegation under the main Codex agent's control.
+Board-scoped profiles are optional task-specific offers alongside Codex built-in
+agents, other custom agents, and single-agent execution. Available project-local
+and generic profiles: {profiles}. Using Kanban does not require delegation or a
+justification for skipping it. When a registered profile is deliberately chosen,
+select its exact custom-agent type so Codex loads the matching configuration;
+native or otherwise unregistered agents remain visible under the board-scoped
+Codex subagents People role with their reported runtime type.
 When delegated work produces findings, decisions, blockers, or completion
 results, add a concise card comment to the parent coordination card so the
 topic context stays with the parent card, not only with a child card or chat.
@@ -390,10 +434,6 @@ contributors. Each feature/fix implementation card needs its own card-specific
 branch with commits before handoff. Merge it to the release branch only after
 human final review, then rebase or refresh remaining active feature/fix
 branches from that release branch.
-If a Codex environment still disallows spawning from standing project
-instructions alone, record the intended delegation cards and surface the blocker
-instead of silently doing delegated work in the parent context.
-
 Concrete project rules stay in this repo's AGENTS.md; do not copy domain rules
 into the global Kanban app.
 """)

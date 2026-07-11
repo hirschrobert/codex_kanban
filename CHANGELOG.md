@@ -1,5 +1,70 @@
 # Changelog
 
+## 0.1.14 - 2026-07-11
+
+This release keeps linked Git worktrees on their origin project board, adds
+safe cleanup after main integration, and makes every Codex-spawned agent visible
+in People with truthful runtime type, live status, and focused-card context.
+
+Public commits:
+
+- `0f04bfb` resolves linked worktrees to their primary registered repository
+  and exposes the worktree as the card's change source without creating a
+  separate project board.
+- `541f97c` adds guarded, idempotent cleanup for clean card-linked worktrees
+  whose branches have landed in main.
+- `9b2be8c` keeps the project store below the repository size target after the
+  worktree-resolution changes.
+- `bb09512` merges CK-0688 and CK-0689 into `release/0.1.14` after human
+  approval.
+- `36e795a` makes registered Kanban profiles optional offers and leaves
+  delegation and agent selection to the main Codex agent.
+- `4049458` groups built-in and unregistered Codex subagents under a durable
+  People role while preserving each runtime's reported agent type.
+- `f5ccffc` preserves explicit participant card focus across hook heartbeats,
+  synchronizes focus with active assignment transitions, and shows focused
+  cards beside live People state without guessing across parallel instances.
+- `1cf6501` merges CK-0693 through CK-0695 into `release/0.1.14` after human
+  approval and refreshes them over the worktree lifecycle changes.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced; this follows the existing changelog
+convention for avoiding unstable self-hashes.
+
+Changes:
+
+- Kept all cards, participants, and lifecycle events for linked worktrees on
+  the board registered for the primary repository.
+- Distinguished a card's primary target repository from the worktree where its
+  changes are actually produced.
+- Added safe post-merge worktree cleanup with repository, path, cleanliness,
+  and main-ancestry checks.
+- Reframed board-scoped agent profiles as optional project-aware specialists
+  alongside Codex built-ins, other custom agents, and single-agent execution.
+- Added a board-scoped Codex subagents role for `default`, `worker`, `explorer`,
+  and unregistered custom agents while retaining exact profile rows for exact
+  registered types.
+- Preserved the reported runtime type instead of relabeling a native `default`
+  agent as a specialist whose TOML configuration was not loaded.
+- Preserved explicit card focus across hook heartbeats, updated focus on active
+  assignment transitions, and displayed focused and active cards with green
+  live-status indicators in People.
+- Kept parallel same-role instances non-guessing: exact hook card context wins,
+  a sole instance may use explicit role focus, and ambiguous instances retain
+  the role-level card list.
+
+AI disclosure:
+
+This release was developed, reviewed, audited, and prepared by the main AI
+Agent Manager using the exact model `gpt-5.6-sol` (GPT-5.6 Sol). No delegated
+agent was used; the main agent selected serial execution for the cohesive
+liveness, worktree, integration, and local deployment scope. The work was
+coordinated with Codex Kanban checkouts `e52b499` for release intake,
+`9b2be8c` for the worktree lifecycle handoff, and `4049458` for the native-agent
+liveness follow-up and release preparation.
+
 ## 0.1.13 - 2026-07-11
 
 This release makes specialist-agent liveness resilient when Codex reports an

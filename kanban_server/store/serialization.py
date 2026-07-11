@@ -82,6 +82,22 @@ class SerializationCoordinationMixin(_StoreMixinContract):
         card.setdefault("assignee_is_active", False)
         card.setdefault("assignee_is_stale", False)
         card.setdefault("assignee_has_live_instances", False)
+        target_repo = self._normalised_path(card.get("target_repo"))
+        worktree_path = self._normalised_path(card.get("worktree_path"))
+        if worktree_path and worktree_path != target_repo:
+            card["change_source"] = {
+                "kind": "worktree",
+                "path": worktree_path,
+                "repository_path": target_repo or "",
+            }
+        elif target_repo:
+            card["change_source"] = {
+                "kind": "repository",
+                "path": target_repo,
+                "repository_path": target_repo,
+            }
+        else:
+            card["change_source"] = None
         return card
 
     def _attach_affected_project_paths(

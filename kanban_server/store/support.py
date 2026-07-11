@@ -52,6 +52,11 @@ LEGACY_LOCAL_COMMENT_AUTHOR_NAMES = {"local human"}
 DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME = "AI Agent Manager"
 DEFAULT_AI_AGENT_MANAGER_ROLE = "Main AI agent coordinating Kanban cards through the CLI."
 DEFAULT_AI_AGENT_MANAGER_SUFFIX = "ai-agent-manager"
+DEFAULT_CODEX_SUBAGENTS_DISPLAY_NAME = "Codex subagents"
+DEFAULT_CODEX_SUBAGENTS_ROLE = (
+    "Runtime-selected Codex subagents that are not bound to a registered Kanban profile."
+)
+DEFAULT_CODEX_SUBAGENTS_SUFFIX = "codex-subagents"
 PARTICIPANT_STATUSES = {
     "idle",
     "running",

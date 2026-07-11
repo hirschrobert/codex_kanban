@@ -297,6 +297,7 @@ class KanbanStoreProjectCoordinationTest(KanbanStoreProjectCase):
 
         for profile in GENERIC_AGENT_PROFILES:
             self.assertIn(f"{project['board_slug']}-{profile.replace('_', '-')}", agent_ids)
+        self.assertIn("demo-codex-subagents", agent_ids)
 
     def test_register_project_discovers_project_local_agents(self) -> None:
         store = self.make_store()
@@ -359,7 +360,9 @@ class KanbanStoreProjectCoordinationTest(KanbanStoreProjectCase):
         self.assertIn("domain_model_steward", overview["agent_profiles"])
         self.assertIn("qa_reviewer", overview["agent_profiles"])
         self.assertIn("demo-ai-agent-manager", overview["agent_participant_ids"])
+        self.assertIn("demo-codex-subagents", overview["agent_participant_ids"])
         self.assertIn("demo-ai-agent-manager", agent_ids)
+        self.assertIn("demo-codex-subagents", agent_ids)
         self.assertIn("demo-domain-model-steward", agent_ids)
         self.assertIn("demo-qa-reviewer", agent_ids)
 

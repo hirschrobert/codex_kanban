@@ -108,7 +108,7 @@ class OverviewStoreMixin(_StoreMixinContract):
 
     def _overview_projects(self, conn: sqlite3.Connection) -> list[dict[str, Any]]:
         projects: list[dict[str, Any]] = []
-        for project in self._list_projects(conn, include_removed=False):
+        for project in self._visible_projects(self._list_projects(conn, include_removed=False)):
             projects.append(
                 {
                     "slug": project.get("slug"),
@@ -308,6 +308,7 @@ class OverviewStoreMixin(_StoreMixinContract):
             "target_branch",
             "feature_branch",
             "worktree_path",
+            "change_source",
             "blocker_reason",
             "affected_paths",
             "affected_project_paths",

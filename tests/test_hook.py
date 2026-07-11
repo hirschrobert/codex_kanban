@@ -109,7 +109,7 @@ class HookAutoRegistrationTest(unittest.TestCase):
         self.assertEqual(participant_id, "demo-ai-agent-manager")
         self.assertEqual(raw_agent_id, "session-123")
 
-    def test_unknown_subagent_does_not_create_a_people_row(self) -> None:
+    def test_unknown_subagent_uses_native_people_role(self) -> None:
         participant_id, raw_agent_id = hook._participant_id_for_hook(
             {"agent_id": "agent-unknown"},
             "SubagentStart",
@@ -117,97 +117,8 @@ class HookAutoRegistrationTest(unittest.TestCase):
             "demo",
         )
 
-        self.assertEqual(participant_id, "")
+        self.assertEqual(participant_id, "demo-codex-subagents")
         self.assertEqual(raw_agent_id, "agent-unknown")
-
-    def test_untyped_subagent_binds_to_sole_preactivated_specialist(self) -> None:
-        store = self.make_store()
-        store.register_project(
-            {
-                "slug": "demo",
-                "display_name": "Demo",
-                "board_slug": "demo",
-                "card_prefix": "DM",
-                "root_path": self.tmp.name,
-            }
-        )
-        store.upsert_participant(
-            {
-                "id": "demo-project-reviewer",
-                "kind": "agent",
-                "display_name": "project_reviewer",
-                "status": "reviewing",
-                "board_slug": "demo",
-            }
-        )
-
-        participant_id, agent_type, binding_source = hook._participant_for_untyped_subagent(
-            store, "demo", "agent-123"
-        )
-
-        self.assertEqual(participant_id, "demo-project-reviewer")
-        self.assertEqual(agent_type, "project_reviewer")
-        self.assertEqual(binding_source, "sole_preactivated_role")
-
-    def test_untyped_subagent_does_not_guess_between_active_specialists(self) -> None:
-        store = self.make_store()
-        store.register_project(
-            {
-                "slug": "demo",
-                "display_name": "Demo",
-                "board_slug": "demo",
-                "card_prefix": "DM",
-                "root_path": self.tmp.name,
-            }
-        )
-        for profile in ("project_reviewer", "project_architect"):
-            store.upsert_participant(
-                {
-                    "id": f"demo-{profile.replace('_', '-')}",
-                    "kind": "agent",
-                    "display_name": profile,
-                    "status": "reviewing",
-                    "board_slug": "demo",
-                }
-            )
-
-        participant_id, agent_type, binding_source = hook._participant_for_untyped_subagent(
-            store, "demo", "agent-123"
-        )
-
-        self.assertEqual((participant_id, agent_type, binding_source), ("", "", ""))
-
-    def test_untyped_subagent_stop_reuses_existing_runtime_role(self) -> None:
-        store = self.make_store()
-        store.register_project(
-            {
-                "slug": "demo",
-                "display_name": "Demo",
-                "board_slug": "demo",
-                "card_prefix": "DM",
-                "root_path": self.tmp.name,
-            }
-        )
-        store.create_event(
-            {
-                "board_slug": "demo",
-                "event_type": "subagent.started",
-                "participant_id": "demo-project-reviewer",
-                "metadata": {
-                    "raw_agent_id": "agent-123",
-                    "agent_type": "project_reviewer",
-                    "status": "running",
-                },
-            }
-        )
-
-        participant_id, agent_type, binding_source = hook._participant_for_untyped_subagent(
-            store, "demo", "agent-123"
-        )
-
-        self.assertEqual(participant_id, "demo-project-reviewer")
-        self.assertEqual(agent_type, "project_reviewer")
-        self.assertEqual(binding_source, "existing_runtime")
 
     def test_subagent_context_tells_agents_to_comment_on_parent_card(self) -> None:
         message = hook._context_message(
@@ -220,6 +131,8 @@ class HookAutoRegistrationTest(unittest.TestCase):
 
         self.assertIn("parent coordination card", message)
         self.assertIn("findings, decisions, blockers, and next steps", message)
+        self.assertIn("does not require delegation", message)
+        self.assertIn("optional offers", message)
 
     def test_event_metadata_records_the_model_for_each_turn(self) -> None:
         metadata = hook._event_metadata(
@@ -343,7 +256,7 @@ class HookAutoRegistrationTest(unittest.TestCase):
         self.assertEqual(manager["status"], "idle")
         self.assertEqual(manager["instances"], [])
 
-    def test_untyped_subagent_hooks_drive_activated_role_lifecycle(self) -> None:
+    def test_native_subagent_hooks_drive_people_lifecycle_without_relabeling(self) -> None:
         store = self.make_store()
         root = self.make_repo(
             "## Codex Kanban\n\n- You must use the `codex-kanban` skill to coordinate work.\n"
@@ -384,16 +297,17 @@ class HookAutoRegistrationTest(unittest.TestCase):
         ):
             self.assertEqual(hook.main([]), 0)
 
-        reviewer = next(
+        native_role = next(
             participant
             for participant in KanbanStore(store.db_path).snapshot("new-project")["participants"]
-            if participant["id"] == "new-project-project-reviewer"
+            if participant["id"] == "new-project-codex-subagents"
         )
-        self.assertEqual(reviewer["status"], "running")
-        self.assertEqual(reviewer["instances"][0]["id"], "agent-123")
+        self.assertEqual(native_role["status"], "running")
+        self.assertEqual(native_role["instances"][0]["id"], "agent-123")
+        self.assertEqual(native_role["instances"][0]["agent_type"], "default")
         start_event = KanbanStore(store.db_path).snapshot("new-project")["events"][-1]
-        self.assertEqual(start_event["metadata"]["reported_agent_type"], "default")
-        self.assertEqual(start_event["metadata"]["binding_source"], "sole_preactivated_role")
+        self.assertEqual(start_event["metadata"]["agent_type"], "default")
+        self.assertEqual(start_event["metadata"]["binding_source"], "native_subagent")
 
         stop_payload = dict(start_payload, hook_event_name="SubagentStop")
         with (
@@ -402,15 +316,15 @@ class HookAutoRegistrationTest(unittest.TestCase):
         ):
             self.assertEqual(hook.main([]), 0)
 
-        reviewer = next(
+        native_role = next(
             participant
             for participant in KanbanStore(store.db_path).snapshot("new-project")["participants"]
-            if participant["id"] == "new-project-project-reviewer"
+            if participant["id"] == "new-project-codex-subagents"
         )
-        self.assertEqual(reviewer["status"], "idle")
-        self.assertEqual(reviewer["instances"], [])
+        self.assertEqual(native_role["status"], "idle")
+        self.assertEqual(native_role["instances"], [])
         stop_event = KanbanStore(store.db_path).snapshot("new-project")["events"][-1]
-        self.assertEqual(stop_event["metadata"]["binding_source"], "existing_runtime")
+        self.assertEqual(stop_event["metadata"]["binding_source"], "native_subagent")
 
 
 if __name__ == "__main__":

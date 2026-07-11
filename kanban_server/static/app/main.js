@@ -252,6 +252,16 @@ function affectedProjectChipsHtml(card) {
   ].join("");
 }
 
+function changeSourceChipHtml(card) {
+  const source = card.change_source;
+  if (!source?.path) return "";
+  if (source.kind !== "worktree") return "";
+  const name = source.path.split(/[\\/]/).filter(Boolean).pop() || source.path;
+  const repository = source.repository_path ? `; origin repository: ${source.repository_path}` : "";
+  const title = `Changes sourced from worktree: ${source.path}${repository}`;
+  return `<span class="chip worktree-source-chip" title="${escapeHtml(title)}">Worktree: ${escapeHtml(name)}</span>`;
+}
+
 function renderCard(card) {
   const cardEl = document.createElement("article");
   cardEl.draggable = true;
@@ -309,6 +319,7 @@ function renderCard(card) {
         ${affectedCount ? `<span class="chip">Affected: ${affectedCount}</span>` : ""}
         ${affectedProjectCount ? `<span class="chip">Ecosystem: ${affectedProjectCount}</span>` : ""}
         ${affectedProjectChipsHtml(card)}
+        ${changeSourceChipHtml(card)}
         ${deploymentCount ? `<span class="chip">Deploy: ${deploymentCount}</span>` : ""}
         ${card.target_branch ? `<span class="chip">${escapeHtml(card.target_branch)}</span>` : ""}
         ${card.feature_branch ? `<span class="chip">${escapeHtml(card.feature_branch)}</span>` : ""}
@@ -352,6 +363,7 @@ function renderParticipants() {
     const instances = Array.isArray(participant.instances) ? participant.instances : [];
     const activeModels = Array.isArray(participant.active_models) ? participant.active_models : [];
     const activeCards = Array.isArray(participant.active_cards) ? participant.active_cards : [];
+    const focusedCard = participant.focused_card;
     const liveness = instances.length
       ? `${instances.length} live instance${instances.length === 1 ? "" : "s"}`
       : participant.is_stale
@@ -376,6 +388,7 @@ function renderParticipants() {
       <span class="participant-main">
         <span class="participant-name">${escapeHtml(participant.display_name)}</span>
         <span class="participant-role">${escapeHtml(liveness)}${activeModels.length ? ` · ${escapeHtml(activeModels.join(", "))}` : ""} · ${escapeHtml(participant.role || participant.kind)}</span>
+        ${focusedCard ? `<span class="participant-role">Focused: ${escapeHtml(focusedCard.external_id || focusedCard.title)}</span>` : ""}
         ${activeCardSummary ? `<span class="participant-role">Cards: ${escapeHtml(activeCardSummary)}</span>` : ""}
         ${instanceRows ? `<span class="participant-instances">${instanceRows}</span>` : ""}
       </span>

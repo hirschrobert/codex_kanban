@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from .support import (
+    ACTIVE_CARD_STATUSES,
     CARD_TEXT_FIELDS,
     DEFAULT_ACTIVITY_EVENT_LIMIT,
     DEFAULT_REPEAT_TIME,
@@ -55,7 +56,7 @@ class CardStoreMixin(_StoreMixinContract):
             self.ensure_board(board_slug, conn=conn)
             board = self._one(conn, "SELECT * FROM boards WHERE slug = ?", (board_slug,))
             boards = [dict(row) for row in conn.execute("SELECT * FROM boards ORDER BY slug")]
-            projects = self._list_projects(conn, include_removed=False)
+            projects = self._visible_projects(self._list_projects(conn, include_removed=False))
             all_projects = self._list_projects(conn, include_removed=True)
             active_project = self._project_from_row(
                 self._one(
@@ -279,6 +280,12 @@ class CardStoreMixin(_StoreMixinContract):
                 )
             self._sync_card_links(conn, card_id, payload, creating=True)
             self._assert_dependencies_allow_status(conn, card_id, status)
+            self._sync_assignee_card_focus(
+                conn,
+                card_id=card_id,
+                previous=None,
+                current={"assignee_id": assignee_id, "status": status},
+            )
             row = self._one(conn, "SELECT * FROM cards WHERE id = ?", (card_id,))
             card = self._card_from_row(row)
             self._attach_dependency_links(conn, [card])
@@ -396,9 +403,59 @@ class CardStoreMixin(_StoreMixinContract):
             status_changed = "status" in updates and updates["status"] != current["status"]
             if status_changed:
                 self._assert_dependencies_allow_status(conn, card_id, updated["status"])
+            self._sync_assignee_card_focus(
+                conn,
+                card_id=card_id,
+                previous=current,
+                current=updated,
+            )
             card = self._card_from_row(updated)
             self._attach_dependency_links(conn, [card])
             return card
+
+    @staticmethod
+    def _sync_assignee_card_focus(
+        conn: sqlite3.Connection,
+        *,
+        card_id: int,
+        previous: sqlite3.Row | dict[str, Any] | None,
+        current: sqlite3.Row | dict[str, Any],
+    ) -> None:
+        previous_assignee = str(previous["assignee_id"] or "") if previous else ""
+        current_assignee = str(current["assignee_id"] or "")
+        previous_status = str(previous["status"] or "") if previous else ""
+        current_status = str(current["status"] or "")
+        assignee_changed = previous_assignee != current_assignee
+        left_active_status = (
+            previous_status in ACTIVE_CARD_STATUSES and current_status not in ACTIVE_CARD_STATUSES
+        )
+
+        if previous_assignee and (assignee_changed or left_active_status):
+            conn.execute(
+                """
+                UPDATE participants
+                SET current_card_id = NULL, updated_at = ?
+                WHERE id = ? AND current_card_id = ?
+                """,
+                (utc_now(), previous_assignee, card_id),
+            )
+
+        became_active_focus = (
+            current_assignee
+            and current_status in ACTIVE_CARD_STATUSES
+            and (
+                previous is None or assignee_changed or previous_status not in ACTIVE_CARD_STATUSES
+            )
+        )
+        if became_active_focus:
+            conn.execute(
+                """
+                UPDATE participants
+                SET current_card_id = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (card_id, utc_now(), current_assignee),
+            )
 
     def _card_creator_from_payload(
         self,

@@ -88,7 +88,43 @@ class AgentRuntimeSnapshotTest(unittest.TestCase):
             {item["model"] for item in role["instances"]},
             {"gpt-5.6", "gpt-5.6-terra"},
         )
+        self.assertEqual(
+            {item["agent_type"] for item in role["instances"]},
+            {"project_reviewer"},
+        )
         self.assertNotIn("old-raw-agent-row", participant_ids)
+
+    def test_native_subagent_role_preserves_each_reported_type(self) -> None:
+        store = self.make_store()
+        for raw_id, agent_type in (
+            ("agent-default", "default"),
+            ("agent-worker", "worker"),
+            ("agent-custom", "ad_hoc_researcher"),
+        ):
+            store.create_event(
+                {
+                    "board_slug": "demo",
+                    "event_type": "subagent.started",
+                    "participant_id": "demo-codex-subagents",
+                    "metadata": {
+                        "raw_agent_id": raw_id,
+                        "agent_type": agent_type,
+                        "status": "running",
+                    },
+                }
+            )
+
+        native_role = next(
+            item
+            for item in store.snapshot("demo")["participants"]
+            if item["id"] == "demo-codex-subagents"
+        )
+
+        self.assertEqual(native_role["display_name"], "Codex subagents")
+        self.assertEqual(
+            {instance["agent_type"] for instance in native_role["instances"]},
+            {"default", "worker", "ad_hoc_researcher"},
+        )
 
     def test_finished_and_stale_instances_disappear_but_role_remains(self) -> None:
         store = self.make_store()
@@ -166,7 +202,104 @@ class AgentRuntimeSnapshotTest(unittest.TestCase):
         self.assertEqual(manager["active_models"], ["gpt-5.6"])
         self.assertEqual(manager["active_cards"][0]["external_id"], card["external_id"])
         self.assertEqual(manager["instances"][0]["current_card_external_id"], card["external_id"])
-        self.assertEqual(manager["instances"][0]["card_source"], "unique_active_assignment")
+        self.assertEqual(manager["focused_card"]["external_id"], card["external_id"])
+        self.assertEqual(manager["instances"][0]["card_source"], "explicit_participant_focus")
+
+    def test_explicit_focus_beats_ambiguous_active_assignments(self) -> None:
+        store = self.make_store()
+        store.create_event(
+            {
+                "board_slug": "demo",
+                "event_type": "hook.userpromptsubmit",
+                "participant_id": "demo-ai-agent-manager",
+                "metadata": {"raw_agent_id": "session-1", "status": "running"},
+            }
+        )
+        first = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "First",
+                "description": "Older active assignment.",
+                "status": "in_progress",
+                "assignee_id": "demo-ai-agent-manager",
+                "target_branch": "release/1.0.0",
+            }
+        )
+        second = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Second",
+                "description": "Current focused assignment.",
+                "status": "in_progress",
+                "assignee_id": "demo-ai-agent-manager",
+                "target_branch": "release/1.0.0",
+            }
+        )
+
+        manager = next(
+            item
+            for item in store.snapshot("demo")["participants"]
+            if item["id"] == "demo-ai-agent-manager"
+        )
+
+        self.assertEqual(
+            {card["external_id"] for card in manager["active_cards"]},
+            {first["external_id"], second["external_id"]},
+        )
+        self.assertEqual(manager["focused_card"]["external_id"], second["external_id"])
+        self.assertEqual(manager["instances"][0]["current_card_external_id"], second["external_id"])
+        self.assertEqual(manager["instances"][0]["card_source"], "explicit_participant_focus")
+
+    def test_hook_style_upsert_without_card_preserves_explicit_focus(self) -> None:
+        store = self.make_store()
+        card = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Focused",
+                "description": "Current assignment.",
+                "status": "in_progress",
+                "assignee_id": "demo-ai-agent-manager",
+                "target_branch": "release/1.0.0",
+            }
+        )
+
+        store.upsert_participant(
+            {
+                "id": "demo-ai-agent-manager",
+                "kind": "agent",
+                "display_name": "AI Agent Manager",
+                "status": "idle",
+                "board_slug": "demo",
+                "current_scope": "/workspace/demo",
+            }
+        )
+
+        manager = next(
+            item
+            for item in store.snapshot("demo")["participants"]
+            if item["id"] == "demo-ai-agent-manager"
+        )
+        self.assertEqual(manager["current_card_id"], card["id"])
+        self.assertEqual(manager["focused_card"]["external_id"], card["external_id"])
+
+    def test_leaving_active_status_clears_matching_focus(self) -> None:
+        store = self.make_store()
+        card = store.create_card(
+            {
+                "board_slug": "demo",
+                "title": "Focused",
+                "description": "Current assignment.",
+                "status": "in_progress",
+                "assignee_id": "demo-project-reviewer",
+                "target_branch": "release/1.0.0",
+            }
+        )
+
+        store.update_card(card["id"], {"status": "done"})
+
+        reviewer = self.role(store.snapshot("demo"))
+        self.assertIsNone(reviewer["current_card_id"])
+        self.assertIsNone(reviewer["focused_card"])
 
     def test_multiple_active_cards_or_instances_are_not_guessed(self) -> None:
         store = self.make_store()
@@ -198,6 +331,7 @@ class AgentRuntimeSnapshotTest(unittest.TestCase):
         )
 
         self.assertEqual(len(manager["active_cards"]), 2)
+        self.assertIsNotNone(manager["focused_card"])
         self.assertTrue(
             all(not instance["current_card_external_id"] for instance in manager["instances"])
         )
