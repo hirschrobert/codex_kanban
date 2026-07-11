@@ -62,6 +62,8 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
             participant["instance_count"] = 0
             participant["instance_status_counts"] = {}
             participant["has_live_instances"] = False
+            participant["active_models"] = []
+            participant["active_cards"] = []
             if participant.get("kind") == "agent":
                 participant["status"] = "idle"
                 participant["is_stale"] = False
@@ -124,6 +126,28 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
             participant = participants_by_id[participant_id]
             if participant.get("kind") == "agent":
                 participant["instances"].append(instance)
+
+        active_cards: dict[str, dict[int, dict[str, Any]]] = {}
+        for card in conn.execute(
+            """
+            SELECT id, external_id, title, status, assignee_id, owner_id
+            FROM cards
+            WHERE board_slug = ?
+              AND archived_at IS NULL
+              AND status IN ('in_progress', 'review')
+            ORDER BY updated_at DESC, id DESC
+            """,
+            (board_slug,),
+        ):
+            card_summary = {
+                "id": card["id"],
+                "external_id": card["external_id"],
+                "title": card["title"],
+                "status": card["status"],
+            }
+            for participant_id in {card["assignee_id"], card["owner_id"]} - {None, ""}:
+                if participant_id in participants_by_id:
+                    active_cards.setdefault(participant_id, {})[card["id"]] = card_summary
         for participant in participants:
             instances = sorted(
                 participant["instances"],
@@ -140,6 +164,21 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
             participant["instance_count"] = len(instances)
             participant["instance_status_counts"] = counts
             participant["has_live_instances"] = bool(instances)
+            participant["active_models"] = sorted(
+                {str(item.get("model")) for item in instances if item.get("model")}
+            )
+            participant["active_cards"] = list(
+                active_cards.get(str(participant.get("id") or ""), {}).values()
+            )
+            if (
+                len(instances) == 1
+                and not instances[0].get("current_card_external_id")
+                and len(participant["active_cards"]) == 1
+            ):
+                active_card = participant["active_cards"][0]
+                instances[0]["current_card_external_id"] = active_card["external_id"]
+                instances[0]["current_card_title"] = active_card["title"]
+                instances[0]["card_source"] = "unique_active_assignment"
             if participant.get("kind") == "agent" and instances:
                 participant["status"] = str(instances[0]["status"])
                 participant["last_seen_at"] = max(

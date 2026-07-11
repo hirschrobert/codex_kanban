@@ -33,6 +33,14 @@ class PackagingTest(unittest.TestCase):
                 data = tomllib.loads(profile.read_text(encoding="utf-8"))
                 self.assertNotIn("model", data)
 
+        skill = (ROOT / ".codex" / "skills" / "codex-kanban" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        compact_skill = " ".join(skill.split())
+        self.assertIn("inherit the current model", compact_skill)
+        self.assertIn("supported lighter model", compact_skill)
+        self.assertIn("actual runtime model", compact_skill)
+
     @unittest.skipUnless(shutil.which("uv"), "uv is required for package build checks")
     def test_wheel_includes_dashboard_static_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

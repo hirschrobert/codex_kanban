@@ -79,6 +79,9 @@ class StaticAssetTest(unittest.TestCase):
         self.assertIn("participant.instances", app)
         self.assertIn('class="participant-instance"', app)
         self.assertIn("event.metadata?.model", app)
+        self.assertIn("participant.active_models", app)
+        self.assertIn("participant.active_cards", app)
+        self.assertIn("Cards: ${escapeHtml(activeCardSummary)}", app)
         self.assertIn(".participant-instances", sidebar)
         self.assertNotIn("participantLimit", state)
 

@@ -350,6 +350,8 @@ function renderParticipants() {
     row.className = `participant-row ghost-button ${participant.is_stale ? "stale" : ""}`;
     const dotClass = participant.is_stale ? "status-stale" : `status-${participant.status}`;
     const instances = Array.isArray(participant.instances) ? participant.instances : [];
+    const activeModels = Array.isArray(participant.active_models) ? participant.active_models : [];
+    const activeCards = Array.isArray(participant.active_cards) ? participant.active_cards : [];
     const liveness = instances.length
       ? `${instances.length} live instance${instances.length === 1 ? "" : "s"}`
       : participant.is_stale
@@ -365,11 +367,16 @@ function renderParticipants() {
         `
       )
       .join("");
+    const activeCardSummary = activeCards
+      .map((card) => card.external_id || card.title)
+      .filter(Boolean)
+      .join(", ");
     row.innerHTML = `
       <span class="status-dot ${dotClass}"></span>
       <span class="participant-main">
         <span class="participant-name">${escapeHtml(participant.display_name)}</span>
-        <span class="participant-role">${escapeHtml(liveness)} · ${escapeHtml(participant.role || participant.kind)}</span>
+        <span class="participant-role">${escapeHtml(liveness)}${activeModels.length ? ` · ${escapeHtml(activeModels.join(", "))}` : ""} · ${escapeHtml(participant.role || participant.kind)}</span>
+        ${activeCardSummary ? `<span class="participant-role">Cards: ${escapeHtml(activeCardSummary)}</span>` : ""}
         ${instanceRows ? `<span class="participant-instances">${instanceRows}</span>` : ""}
       </span>
     `;
