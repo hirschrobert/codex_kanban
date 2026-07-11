@@ -18,6 +18,9 @@ from .store.support import (
     DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME,
     DEFAULT_AI_AGENT_MANAGER_ROLE,
     DEFAULT_AI_AGENT_MANAGER_SUFFIX,
+    DEFAULT_CODEX_SUBAGENTS_DISPLAY_NAME,
+    DEFAULT_CODEX_SUBAGENTS_ROLE,
+    DEFAULT_CODEX_SUBAGENTS_SUFFIX,
     DEFAULT_DB_PATH,
     GENERIC_AGENT_PROFILES,
     agent_profile_id,
@@ -222,42 +225,8 @@ def _participant_id_for_hook(
         profile_id = agent_profile_id(agent_type)
         if profile_id in known_profiles:
             return slugify(f"{board_slug}-{profile_id}"), raw_agent_id
-        return "", raw_agent_id
+        return slugify(f"{board_slug}-{DEFAULT_CODEX_SUBAGENTS_SUFFIX}"), raw_agent_id
     return slugify(f"{board_slug}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}"), raw_agent_id
-
-
-def _participant_for_untyped_subagent(
-    store: KanbanStore,
-    board_slug: str,
-    raw_agent_id: str,
-) -> tuple[str, str, str]:
-    """Resolve a default Codex subagent only when board state is unambiguous."""
-    manager_id = slugify(f"{board_slug}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}")
-    participants = [
-        participant
-        for participant in store.snapshot(board_slug).get("participants", [])
-        if participant.get("kind") == "agent" and participant.get("id") != manager_id
-    ]
-    runtime_matches = [
-        participant
-        for participant in participants
-        if any(
-            str(instance.get("id") or "") == raw_agent_id
-            for instance in participant.get("instances", [])
-        )
-    ]
-    candidates = runtime_matches or [
-        participant for participant in participants if participant.get("is_active_status")
-    ]
-    if len(candidates) != 1:
-        return "", "", ""
-    participant = candidates[0]
-    source = "existing_runtime" if runtime_matches else "sole_preactivated_role"
-    return (
-        str(participant.get("id") or ""),
-        str(participant.get("display_name") or ""),
-        source,
-    )
 
 
 def _status_for_hook(hook_name: str) -> str:
@@ -358,14 +327,15 @@ def _context_message(project: dict[str, Any], board_slug: str) -> str:
         "Use the `codex-kanban` skill for the shared orchestration workflow: "
         "respect human-added cards, work only on the assigned card/scope, update "
         "status, and produce auditable handoffs. "
-        "When the user or repo instructions say to use Codex Kanban, treat that "
-        "as a request for coordinated subagent delegation where feasible and "
-        "safe; create/update the relevant cards and use board-scoped participant "
-        "IDs before spawning scoped agents. "
+        "Codex Kanban does not require delegation or choose agents for the main "
+        "agent. Decide whether native built-in agents, custom agents, registered "
+        "Kanban profiles, or no delegation best fit the task. Registered profiles "
+        "are optional offers; when deliberately selecting one, use its exact "
+        "custom-agent name so its TOML configuration is loaded. "
         "When delegated work finishes, add a concise result comment to the "
         "parent coordination card so findings, decisions, blockers, and next "
         "steps stay with the topic context. "
-        f"Use the registered agent profiles for this project when delegating: {profiles}. "
+        f"Available registered agent profiles for this project: {profiles}. "
         "Project-specific agent extensions live in the project repo's .codex/agents. "
         f"Read the concrete project instructions before work: {instructions}."
     )
@@ -415,8 +385,6 @@ def main(argv: list[str] | None = None) -> int:
     project = _refresh_project_agents(store, project, server_url) or project
     hook_name = _hook_name(payload)
     agent_type = _agent_type(payload)
-    reported_agent_type = agent_type
-    binding_source = "reported_agent_type"
     participant_id, raw_agent_id = _participant_id_for_hook(
         payload,
         hook_name,
@@ -424,23 +392,26 @@ def main(argv: list[str] | None = None) -> int:
         board_slug,
         project.get("agent_profiles", []) if project else [],
     )
-    if not participant_id and "subagent" in hook_name.lower():
-        participant_id, resolved_agent_type, binding_source = _participant_for_untyped_subagent(
-            store,
-            board_slug,
-            raw_agent_id,
-        )
-        if resolved_agent_type:
-            agent_type = resolved_agent_type
     card_external_id = _explicit_card_external_id(payload)
     participant = None
     if participant_id:
         is_subagent = "subagent" in hook_name.lower()
+        is_native_subagent = participant_id == slugify(
+            f"{board_slug}-{DEFAULT_CODEX_SUBAGENTS_SUFFIX}"
+        )
         participant = {
             "id": participant_id,
             "kind": "agent",
-            "display_name": (agent_type if is_subagent else DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME),
-            "role": agent_type if is_subagent else DEFAULT_AI_AGENT_MANAGER_ROLE,
+            "display_name": (
+                DEFAULT_CODEX_SUBAGENTS_DISPLAY_NAME
+                if is_native_subagent
+                else agent_type if is_subagent else DEFAULT_AI_AGENT_MANAGER_DISPLAY_NAME
+            ),
+            "role": (
+                DEFAULT_CODEX_SUBAGENTS_ROLE
+                if is_native_subagent
+                else agent_type if is_subagent else DEFAULT_AI_AGENT_MANAGER_ROLE
+            ),
             "status": "idle",
             "board_slug": board_slug,
             "current_scope": cwd,
@@ -455,9 +426,8 @@ def main(argv: list[str] | None = None) -> int:
         raw_agent_id=raw_agent_id,
         agent_type=agent_type,
     )
-    if reported_agent_type != agent_type:
-        metadata["reported_agent_type"] = reported_agent_type
-        metadata["binding_source"] = binding_source
+    if participant_id == slugify(f"{board_slug}-{DEFAULT_CODEX_SUBAGENTS_SUFFIX}"):
+        metadata["binding_source"] = "native_subagent"
     event = {
         "board_slug": board_slug,
         "event_type": _event_type_for_hook(hook_name),

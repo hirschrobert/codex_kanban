@@ -88,7 +88,43 @@ class AgentRuntimeSnapshotTest(unittest.TestCase):
             {item["model"] for item in role["instances"]},
             {"gpt-5.6", "gpt-5.6-terra"},
         )
+        self.assertEqual(
+            {item["agent_type"] for item in role["instances"]},
+            {"project_reviewer"},
+        )
         self.assertNotIn("old-raw-agent-row", participant_ids)
+
+    def test_native_subagent_role_preserves_each_reported_type(self) -> None:
+        store = self.make_store()
+        for raw_id, agent_type in (
+            ("agent-default", "default"),
+            ("agent-worker", "worker"),
+            ("agent-custom", "ad_hoc_researcher"),
+        ):
+            store.create_event(
+                {
+                    "board_slug": "demo",
+                    "event_type": "subagent.started",
+                    "participant_id": "demo-codex-subagents",
+                    "metadata": {
+                        "raw_agent_id": raw_id,
+                        "agent_type": agent_type,
+                        "status": "running",
+                    },
+                }
+            )
+
+        native_role = next(
+            item
+            for item in store.snapshot("demo")["participants"]
+            if item["id"] == "demo-codex-subagents"
+        )
+
+        self.assertEqual(native_role["display_name"], "Codex subagents")
+        self.assertEqual(
+            {instance["agent_type"] for instance in native_role["instances"]},
+            {"default", "worker", "ad_hoc_researcher"},
+        )
 
     def test_finished_and_stale_instances_disappear_but_role_remains(self) -> None:
         store = self.make_store()

@@ -8,6 +8,7 @@ from .support import (
     ACTIVE_PARTICIPANT_STATUSES,
     DEFAULT_ACTIVITY_EVENT_LIMIT,
     DEFAULT_AI_AGENT_MANAGER_SUFFIX,
+    DEFAULT_CODEX_SUBAGENTS_SUFFIX,
     EVENT_RETENTION_HOURS,
     PARTICIPANT_KINDS,
     STALE_AFTER_SECONDS,
@@ -42,6 +43,7 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
         if active_project:
             role_ids = {
                 slugify(f"{board_slug}-{DEFAULT_AI_AGENT_MANAGER_SUFFIX}"),
+                slugify(f"{board_slug}-{DEFAULT_CODEX_SUBAGENTS_SUFFIX}"),
                 *(
                     slugify(f"{board_slug}-{agent_profile_id(profile)}")
                     for profile in active_project.get("agent_profiles", [])
@@ -105,6 +107,7 @@ class ParticipantEventStoreMixin(_StoreMixinContract):
                 continue
             runtime[key] = {
                 "id": raw_agent_id,
+                "agent_type": str(metadata.get("agent_type") or ""),
                 "status": status,
                 "model": str(metadata.get("model") or ""),
                 "session_id": str(metadata.get("session_id") or ""),
