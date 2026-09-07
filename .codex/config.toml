@@ -1,0 +1,8 @@
+# Keep the main model independently selectable. Explicit spawn settings take
+# precedence over these subagent defaults; custom-agent pins take precedence
+# over both. See skills/codex-kanban/model-routing.md for role selection.
+service_tier = "default"
+
+[agents]
+default_subagent_model = "gpt-5.6-sol"
+default_subagent_reasoning_effort = "high"

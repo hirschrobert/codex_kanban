@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.1.16 - 2026-09-07
+
+This release adds cost-controlled subagent defaults, a dedicated defensive
+security reviewer, and support for confidential local security-policy context.
+
+Public commits:
+
+- `074d754` adds Sol/high subagent defaults, Standard-speed profiles, deliberate
+  role-based model selection and Astra escalation, the Daybreak Blue security
+  reviewer, and configuration, registration, and runtime-reporting tests.
+- `cfb61ab` makes security-policy discovery include untracked and Git-ignored
+  files and documents confidential context, local exclusions, and sanitized
+  handoffs.
+- `7c85106` merges CK-1773 through CK-1776 into `release/0.1.16` after human
+  approval.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced.
+
+Changes:
+
+- Kept the main model independently selectable while giving general subagents
+  a GPT-5.6 Sol/high fallback. General profiles allow explicit model and effort
+  selection; the routing guide recommends Terra for bounded work and Sol/xhigh
+  for demanding review, with evidence-based escalation to an Astra main agent
+  or explicitly selected contributor.
+- Added a read-only security reviewer pinned to Daybreak Blue/xhigh, with
+  Standard speed, exact role tracking, an explicit availability fallback, and
+  task-specific security review and fix-verification guidance.
+- Included optional root and nested security policies regardless of Git
+  tracking, plus explicitly referenced local documents, while preserving
+  confidentiality in shared cards, reports, and handoffs.
+- Documented installation, configuration precedence, local exclusions, and
+  the need for a new Codex session to load updated custom profiles.
+
+AI disclosure:
+
+This release was developed, reviewed, audited, and prepared by the main AI
+Agent Manager using the exact model `gpt-6-astra` (GPT-6 Astra), verified from
+the session's runtime hook events. No delegated agents were used. The work was
+coordinated by the installed and running Codex Kanban checkout `28d0586`
+(version 0.1.15), verified from the running service's application metadata.
+
 ## 0.1.15 - 2026-07-11
 
 This release reduces realtime snapshot amplification across concurrent project
