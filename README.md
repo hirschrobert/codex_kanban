@@ -17,9 +17,9 @@ ships reusable Codex skill and agent definitions under `.codex/`.
 - Card comments for human notes and delegated-agent feedback.
 - Dependency links, recurring workflow cards, archive support, and release
   guardrails.
-- Generic agent profile TOMLs that inherit the calling Codex session model for
-  implementation, review, release, audit, architecture, API contract, domain
-  model, and test strategy work.
+- Generic agent profiles for implementation, review, security, release, audit,
+  architecture, API contracts, domain models, and test strategy, with cheaper
+  GPT-5.6 subagent defaults, Standard speed, and deliberate Astra escalation.
 
 ## Quick Start
 
