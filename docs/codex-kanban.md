@@ -750,6 +750,8 @@ Reusable profiles live in `.codex/agents/` in this repository, or
 - `project_implementer`: bounded implementation worker.
 - `project_reviewer`: read-only correctness, regression, security, and test
   review.
+- `security_reviewer`: read-only defensive security, vulnerability validation,
+  and security-fix verification using Daybreak Blue when available.
 - `project_release_manager`: read-only release and CI/CD integration review.
 - `test_strategist`: read-only test strategy, coverage, and verification
   planning.
@@ -757,15 +759,23 @@ Reusable profiles live in `.codex/agents/` in this repository, or
 Project-specific agents can still exist, but they should not be seeded on every
 board by default. The default CI/CD flow should use these abstract profiles and
 let each repo's `AGENTS.md` provide concrete commands and constraints.
-The packaged TOML definitions omit `model`, so spawned agents inherit the model
-used by the calling Codex session instead of pinning a release-specific model.
-Inheritance is the default, not a requirement: when the active Codex surface
-supports per-agent selection, the main agent may request a supported lighter
-model for bounded low-risk scans, triage, or summarization while retaining the
-current stronger model for ambiguous implementation, architecture, release,
-security, and data-integrity work. People reports the actual hook-supplied
-runtime model for each live instantiation and summarizes all active models on
-the stable role row.
+The shipped `.codex/config.toml` supplies a `gpt-5.6-sol`/`high` subagent
+fallback and Standard speed without changing the main model. General profiles
+omit both model and reasoning effort so the main agent can explicitly select
+Terra for bounded work, Sol/xhigh for demanding review, or Astra/xhigh for an
+unresolved consequential question. Each profile explicitly sets Standard speed.
+The security specialist pins `gpt-daybreak-blue-latest`/`xhigh`; verify account
+availability before selecting it. The main agent owns escalation: an Astra
+main agent can resolve a contributor's evidence handoff directly, or a main
+agent on another model can explicitly request a focused Astra contributor.
+
+Read the [model routing guide](../.codex/skills/codex-kanban/model-routing.md)
+for the role table, configuration precedence, Daybreak fallback, and escalation
+handoff. See [Codex asset installation](../.codex/README.md) to apply the defaults
+across repositories. Refresh People after installation and start a new Codex
+session to load changed custom profiles. Kanban does not enforce model routing;
+People reports actual hook-supplied runtime models for each live instantiation
+and summarizes all active models on the stable role row.
 
 For OpenAI or Codex documentation lookup, use the bundled OpenAI Docs
 skill/agent from Codex instead of registering a duplicate global profile.

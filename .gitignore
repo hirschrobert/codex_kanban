@@ -22,6 +22,7 @@ build/
 # Keep clonable Codex skill/agent definitions while ignoring local Codex state.
 .codex/*
 !.codex/README.md
+!.codex/config.toml
 !.codex/agents/
 !.codex/agents/**
 !.codex/skills/

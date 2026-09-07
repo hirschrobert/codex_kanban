@@ -293,11 +293,15 @@ class KanbanStoreProjectCoordinationTest(KanbanStoreProjectCase):
             }
         )
 
-        agent_ids = {participant["id"] for participant in store.snapshot("demo")["participants"]}
+        participants = store.snapshot("demo")["participants"]
+        agent_ids = {participant["id"] for participant in participants}
 
         for profile in GENERIC_AGENT_PROFILES:
             self.assertIn(f"{project['board_slug']}-{profile.replace('_', '-')}", agent_ids)
         self.assertIn("demo-codex-subagents", agent_ids)
+        self.assertIn("security_reviewer", project["agent_profiles"])
+        security = next(item for item in participants if item["id"] == "demo-security-reviewer")
+        self.assertIn("vulnerability validation", security["role"])
 
     def test_register_project_discovers_project_local_agents(self) -> None:
         store = self.make_store()
@@ -358,6 +362,9 @@ class KanbanStoreProjectCoordinationTest(KanbanStoreProjectCase):
 
         self.assertTrue(overview["agent_profiles_refreshed"])
         self.assertIn("domain_model_steward", overview["agent_profiles"])
+        self.assertIn("security_reviewer", overview["agent_profiles"])
+        self.assertIn("demo-security-reviewer", overview["agent_participant_ids"])
+        self.assertIn("demo-security-reviewer", agent_ids)
         self.assertIn("qa_reviewer", overview["agent_profiles"])
         self.assertIn("demo-ai-agent-manager", overview["agent_participant_ids"])
         self.assertIn("demo-codex-subagents", overview["agent_participant_ids"])

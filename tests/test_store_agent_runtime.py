@@ -126,6 +126,30 @@ class AgentRuntimeSnapshotTest(unittest.TestCase):
             {"default", "worker", "ad_hoc_researcher"},
         )
 
+    def test_security_role_reports_observed_model_without_inventing_a_snapshot(self) -> None:
+        store = self.make_store()
+        for model in ("gpt-daybreak-blue-latest", "gpt-5.6-sol", ""):
+            with self.subTest(reported_model=model):
+                store.create_event(
+                    {
+                        "board_slug": "demo",
+                        "event_type": "subagent.started",
+                        "participant_id": "demo-security-reviewer",
+                        "metadata": {
+                            "raw_agent_id": "security-1",
+                            "agent_type": "security_reviewer",
+                            "model": model,
+                        },
+                    }
+                )
+                role = next(
+                    item
+                    for item in store.snapshot("demo")["participants"]
+                    if item["id"] == "demo-security-reviewer"
+                )
+                self.assertEqual(role["instances"][0]["model"], model)
+                self.assertEqual(role["active_models"], [model] if model else [])
+
     def test_finished_and_stale_instances_disappear_but_role_remains(self) -> None:
         store = self.make_store()
         started = self.runtime_event(store, raw_id="finished-agent")

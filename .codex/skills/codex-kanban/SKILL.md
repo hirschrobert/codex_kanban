@@ -192,6 +192,7 @@ Use board-scoped participants for Kanban state:
 - `<board>-project-architect`
 - `<board>-project-implementer`
 - `<board>-project-reviewer`
+- `<board>-security-reviewer`
 - `<board>-project-release-manager`
 - other registered project-local profiles.
 
@@ -209,18 +210,27 @@ best fit. Registered board profiles are an optional catalog of project-aware
 specialists, not the exclusive agent pool. The main agent stays responsible for
 routing, integration, card hygiene, and the final user summary.
 
-Agent profiles omit `model`, so inheritance from the calling session is the
-safe default. Before each delegation, the main agent should deliberately choose
-the model strategy when the current Codex surface supports per-agent model
-selection:
+Before delegation, read [model-routing.md](model-routing.md) and deliberately
+select the model and effort for the task. The shipped Codex configuration uses
+`gpt-5.6-sol`/`high` as the subagent fallback without changing the main model.
+Request Terra for bounded implementation, impact mapping and board audits;
+request Sol/xhigh for demanding architecture, review and domain-model work.
+Use Standard speed. General profiles leave model and effort unpinned so explicit
+spawn choices remain possible; every profile sets `service_tier = "default"`.
 
-- inherit the current model for ambiguous implementation, architecture,
-  release, security, data-integrity, or high-risk review work;
-- request a supported lighter model for bounded, low-risk scans, triage,
-  summarization, or high-parallelism exploration when speed/cost is preferable;
-- fall back to inheritance when the spawn surface cannot select a model;
-- never infer the model from the role profile: record and display the actual
-  runtime model reported by Codex hooks.
+The `security_reviewer` specialist pins `gpt-daybreak-blue-latest`/`xhigh`.
+Check availability before selecting it and use the routing guide's explicit
+Sol fallback if necessary. A custom-file pin takes precedence over spawn
+arguments. Installing a profile does not grant model access or install the
+Codex Security skills.
+
+Astra escalation belongs to the main agent. Contributors return the unresolved
+question, evidence and attempted checks. An Astra main agent may resolve it
+directly; otherwise the main agent can request a bounded Astra/xhigh contributor
+where the spawn surface supports it. Do not assume that a task label, prompt,
+or escalation request switches a running model. When selection or cheaper
+defaults are unavailable, disclose the inherited-model limitation before
+expensive fan-out. Record the actual runtime model reported by Codex hooks.
 
 Keep model choice separate from role identity so concurrent instantiations of
 one role may use different models without creating duplicate People entries.

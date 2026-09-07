@@ -96,6 +96,9 @@ GENERIC_AGENT_PROFILES = {
     "project_architect": "Read-only architecture, contracts, release-train, and risk analysis.",
     "project_implementer": "Bounded implementation worker with scoped file ownership.",
     "project_reviewer": "Read-only correctness, regression, security, and test review.",
+    "security_reviewer": (
+        "Read-only defensive security, vulnerability validation, and security-fix verification."
+    ),
     "project_release_manager": "Read-only release, CI/CD, packaging, and deploy-readiness review.",
     "test_strategist": "Read-only test strategy, coverage, and verification planning.",
 }

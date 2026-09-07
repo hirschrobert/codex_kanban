@@ -98,6 +98,25 @@ class HookAutoRegistrationTest(unittest.TestCase):
         self.assertEqual(participant_id, "demo-domain-accountant")
         self.assertEqual(raw_agent_id, "subagent-456")
 
+    def test_security_specialist_is_identified_by_type_not_task_or_model(self) -> None:
+        for agent_type, expected in (
+            ("security_reviewer", "demo-security-reviewer"),
+            ("default", "demo-codex-subagents"),
+        ):
+            with self.subTest(agent_type=agent_type):
+                participant_id, raw_id = hook._participant_id_for_hook(
+                    {
+                        "agent_id": "security-123",
+                        "task_name": "security_reviewer",
+                        "model": "gpt-daybreak-blue-latest",
+                    },
+                    "SubagentStart",
+                    agent_type,
+                    "demo",
+                )
+                self.assertEqual(participant_id, expected)
+                self.assertEqual(raw_id, "security-123")
+
     def test_main_turn_uses_stable_manager_role_and_raw_runtime_id(self) -> None:
         participant_id, raw_agent_id = hook._participant_id_for_hook(
             {"session_id": "session-123"},
