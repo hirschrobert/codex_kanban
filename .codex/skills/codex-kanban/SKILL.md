@@ -224,6 +224,12 @@ Sol fallback if necessary. A custom-file pin takes precedence over spawn
 arguments. Installing a profile does not grant model access or install the
 Codex Security skills.
 
+Security context may live in untracked or Git-ignored repository-local files.
+Discover optional `SECURITY.md` policies from the filesystem and read explicitly
+referenced local security documents regardless of Git tracking. Follow the
+routing guide's local-policy rules; use confidential context for the authorized
+review and keep shared cards, reports, and handoffs to sanitized conclusions.
+
 Astra escalation belongs to the main agent. Contributors return the unresolved
 question, evidence and attempted checks. An Astra main agent may resolve it
 directly; otherwise the main agent can request a bounded Astra/xhigh contributor

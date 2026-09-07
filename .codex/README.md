@@ -24,5 +24,10 @@ startup overview to refresh board participants. Refreshing People does not
 reload an already-running agent's model configuration. Daybreak requires access
 in the active account/client; see the routing guide for the explicit fallback.
 
+Security policy can remain repository-local and ignored by Git. The reviewer
+considers applicable `SECURITY.md` files regardless of tracking, plus explicitly
+referenced local security documents. Use `.git/info/exclude` for a local-only
+exclusion and follow the routing guide's confidentiality rules for handoffs.
+
 Local Codex state, databases, logs, and machine-specific configuration should
 remain outside the repository or in ignored `.local` files.

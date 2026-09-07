@@ -777,6 +777,14 @@ session to load changed custom profiles. Kanban does not enforce model routing;
 People reports actual hook-supplied runtime models for each live instantiation
 and summarizes all active models on the stable role row.
 
+Security review context can include confidential, untracked or Git-ignored
+repository-local policy. The reviewer discovers optional root/nested
+`SECURITY.md` files from the filesystem and also reads explicitly referenced
+local documents; a Git-based source inventory must not hide that context.
+Private policy stays out of Git and shared reports unless disclosure is
+explicitly authorized. See the routing guide's local-policy section for
+inheritance, `.git/info/exclude`, and sanitized handoffs.
+
 For OpenAI or Codex documentation lookup, use the bundled OpenAI Docs
 skill/agent from Codex instead of registering a duplicate global profile.
 
