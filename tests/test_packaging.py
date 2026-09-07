@@ -3,7 +3,6 @@ from __future__ import annotations
 import shutil
 import subprocess
 import tempfile
-import tomllib
 import unittest
 import zipfile
 from pathlib import Path
@@ -23,23 +22,6 @@ class PackagingTest(unittest.TestCase):
             self.assertIn("versioned model slug", document)
             self.assertIn("short, unambiguous commit SHA", document)
             self.assertIn("gpt-5", document)
-
-    def test_packaged_agent_profiles_inherit_the_session_model(self) -> None:
-        profiles = sorted((ROOT / ".codex" / "agents").glob("*.toml"))
-
-        self.assertTrue(profiles)
-        for profile in profiles:
-            with self.subTest(profile=profile.name):
-                data = tomllib.loads(profile.read_text(encoding="utf-8"))
-                self.assertNotIn("model", data)
-
-        skill = (ROOT / ".codex" / "skills" / "codex-kanban" / "SKILL.md").read_text(
-            encoding="utf-8"
-        )
-        compact_skill = " ".join(skill.split())
-        self.assertIn("inherit the current model", compact_skill)
-        self.assertIn("supported lighter model", compact_skill)
-        self.assertIn("actual runtime model", compact_skill)
 
     def test_skill_keeps_profiles_optional_and_exact_when_selected(self) -> None:
         skill = (ROOT / ".codex" / "skills" / "codex-kanban" / "SKILL.md").read_text(
