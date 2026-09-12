@@ -10,7 +10,10 @@ agent, and optional subagents. Keep the dashboard generic: project-specific
 domain, release, deployment, security, and verification rules stay in the
 current repo's `AGENTS.md` and registered instruction files.
 
-For command details and longer examples, see `docs/codex-kanban.md`.
+For command details and longer examples, see the bundled
+[command reference](docs/codex-kanban.md). For installation, service setup,
+updates, verification, and rollback, use the bundled
+[deployment guide](docs/deployment.md).
 
 ## When To Use It
 

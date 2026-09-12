@@ -42,7 +42,10 @@ uv run python -m unittest discover -s tests
 
 ## Documentation
 
-- Main user and agent guide: [docs/codex-kanban.md](docs/codex-kanban.md)
+- Main user and agent guide:
+  [.codex/skills/codex-kanban/docs/codex-kanban.md](.codex/skills/codex-kanban/docs/codex-kanban.md)
+- Installation and deployment:
+  [.codex/skills/codex-kanban/docs/deployment.md](.codex/skills/codex-kanban/docs/deployment.md)
 - Public release checklist: [docs/public-release.md](docs/public-release.md)
 - Release history: [CHANGELOG.md](CHANGELOG.md)
 
