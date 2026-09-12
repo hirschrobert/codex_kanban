@@ -1,0 +1,16 @@
+[Unit]
+Description=Codex Kanban dashboard
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.codex/codex-kanban
+ExecStart=%h/.local/bin/codex-kanban --host 127.0.0.1 --port 8766
+Restart=on-failure
+RestartSec=2
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
