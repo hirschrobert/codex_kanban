@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.1.17 - 2026-09-12
+
+This release makes the Codex Kanban skill self-contained and adds a
+reproducible, documented installation and local deployment workflow.
+
+Public commits:
+
+- `3b9b0f4` bundles the long-form command reference and deployment runbook with
+  the skill, adds a portable systemd user-service template and backup-preserving
+  Codex asset installer, and verifies the installed layout with regression
+  tests.
+- `cba2799` merges the approved CK-1902 repair into `release/0.1.17`.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and bumps package
+version files is not self-referenced.
+
+Changes:
+
+- Kept every local Markdown target inside the installable skill boundary so
+  copied skills no longer advertise repository-only paths.
+- Shipped one canonical command guide inside the skill while retaining the old
+  repository documentation path as a compatibility pointer.
+- Added an installation, update, verification, troubleshooting, and rollback
+  runbook together with a portable systemd user-service template.
+- Added a source-checkout asset installer that validates references, replaces
+  the managed skill as one unit, preserves unrelated custom agents and user
+  configuration, and backs up replaced assets.
+- Added packaging and installer tests that exercise the deployed Codex layout.
+
+AI disclosure:
+
+This release was developed, reviewed, audited, and prepared by the main AI
+Agent Manager using the exact model `gpt-5.6-sol` (GPT-5.6 Sol), verified from
+the session's runtime hook events. No delegated agents were used. The work was
+coordinated by the installed Codex Kanban checkout `3b9b0f4`, verified from the
+installed skill contents and their source commit.
+
 ## 0.1.16 - 2026-09-07
 
 This release adds cost-controlled subagent defaults, a dedicated defensive
