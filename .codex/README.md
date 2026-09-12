@@ -12,12 +12,23 @@ Read [model routing](skills/codex-kanban/model-routing.md) before delegation.
 General profiles leave model and effort selectable by the parent; the security
 specialist pins Daybreak Blue/xhigh. All profiles explicitly use Standard speed.
 
-For use from other repositories, copy the profiles to `~/.codex/agents/` and the
-whole skill directory to `~/.codex/skills/codex-kanban/`. Merge the two `[agents]`
-defaults from `config.toml` into your user configuration, preserving existing
-settings. Keep `service_tier = "default"` for Standard speed. Do not replace the
-entire user configuration. The project configuration applies in trusted
-checkouts; user defaults cover other projects and built-in subagents too.
+For use from other repositories, install or refresh the self-contained skill
+and managed profiles from the source checkout:
+
+```bash
+python3 scripts/install_codex_assets.py
+```
+
+The installer validates bundled references, replaces only the managed skill,
+updates only the packaged profile filenames, preserves unrelated agents, and
+backs up replaced assets. Merge the two `[agents]` defaults from `config.toml`
+into your user configuration manually, preserving existing settings. Keep
+`service_tier = "default"` for Standard speed. Do not replace the entire user
+configuration. The project configuration applies in trusted checkouts; user
+defaults cover other projects and built-in subagents too.
+
+See the [deployment guide](skills/codex-kanban/docs/deployment.md) for dashboard
+service setup, exact update and verification steps, and rollback.
 
 Start a new Codex session to load changed custom agents, then run the Kanban
 startup overview to refresh board participants. Refreshing People does not

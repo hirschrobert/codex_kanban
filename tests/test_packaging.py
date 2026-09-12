@@ -1,16 +1,49 @@
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class PackagingTest(unittest.TestCase):
+    def test_skill_bundle_contains_every_local_markdown_target(self) -> None:
+        skill_root = ROOT / ".codex" / "skills" / "codex-kanban"
+        resolved_root = skill_root.resolve()
+        link_pattern = re.compile(r"\[[^]]*\]\(([^)]+)\)")
+
+        for document in sorted(skill_root.rglob("*.md")):
+            for raw_target in link_pattern.findall(document.read_text(encoding="utf-8")):
+                target = raw_target.strip().split(maxsplit=1)[0].strip("<>")
+                parsed = urlsplit(target)
+                if parsed.scheme or parsed.netloc or not parsed.path:
+                    continue
+                path = Path(unquote(parsed.path))
+                if path.is_absolute():
+                    continue
+                resolved = (document.parent / path).resolve()
+                self.assertTrue(
+                    resolved.is_relative_to(resolved_root),
+                    f"Skill-local target escapes bundle: {document} -> {target}",
+                )
+                self.assertTrue(
+                    resolved.exists(),
+                    f"Missing skill-local target: {document} -> {target}",
+                )
+
+    def test_skill_bundle_contains_deployment_runbook_and_service_template(self) -> None:
+        skill_root = ROOT / ".codex" / "skills" / "codex-kanban"
+
+        self.assertTrue((skill_root / "docs" / "codex-kanban.md").is_file())
+        self.assertTrue((skill_root / "docs" / "deployment.md").is_file())
+        self.assertTrue((skill_root / "assets" / "codex-kanban.service").is_file())
+
     def test_release_instructions_require_exact_ai_disclosure_evidence(self) -> None:
         instructions = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
         skill = (ROOT / ".codex" / "skills" / "codex-kanban" / "SKILL.md").read_text(
