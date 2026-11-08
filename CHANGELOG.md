@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased - target 0.1.19
+
+- Updated Black to 26.10.1 and raised its minimum version to the patched
+  release for the tracked development-tool advisory.
+- Refreshed Pyright to 1.1.414, Ruff to 0.17.4, the setuptools build minimum to
+  84.2.1, and the locked transitive dependencies to their latest stable versions.
+
 ## 0.1.18 - 2026-11-08
 
 This release adds a Daybreak remediation role and isolated security handoffs,

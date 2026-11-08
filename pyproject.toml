@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=84.2.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -43,7 +43,7 @@ typeCheckingMode = "basic"
 
 [dependency-groups]
 dev = [
-    "black>=26.5.1",
-    "pyright>=1.1.411",
-    "ruff>=0.15.20",
+    "black>=26.10.1",
+    "pyright>=1.1.414",
+    "ruff>=0.17.4",
 ]
