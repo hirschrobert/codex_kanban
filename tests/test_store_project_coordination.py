@@ -300,6 +300,7 @@ class KanbanStoreProjectCoordinationTest(KanbanStoreProjectCase):
             self.assertIn(f"{project['board_slug']}-{profile.replace('_', '-')}", agent_ids)
         self.assertIn("demo-codex-subagents", agent_ids)
         self.assertIn("security_reviewer", project["agent_profiles"])
+        self.assertIn("security_remediator", project["agent_profiles"])
         security = next(item for item in participants if item["id"] == "demo-security-reviewer")
         self.assertIn("vulnerability validation", security["role"])
 
@@ -363,6 +364,9 @@ class KanbanStoreProjectCoordinationTest(KanbanStoreProjectCase):
         self.assertTrue(overview["agent_profiles_refreshed"])
         self.assertIn("domain_model_steward", overview["agent_profiles"])
         self.assertIn("security_reviewer", overview["agent_profiles"])
+        self.assertEqual(overview["agent_profiles"].count("security_remediator"), 1)
+        self.assertIn("demo-security-remediator", overview["agent_participant_ids"])
+        self.assertIn("demo-security-remediator", agent_ids)
         self.assertIn("demo-security-reviewer", overview["agent_participant_ids"])
         self.assertIn("demo-security-reviewer", agent_ids)
         self.assertIn("qa_reviewer", overview["agent_profiles"])

@@ -45,6 +45,7 @@ class HookAutoRegistrationTest(unittest.TestCase):
         self.assertEqual(matched["slug"], "new-project")
         self.assertIn("domain_model_steward", project["agent_profiles"])
         self.assertIn("api_contract_steward", project["agent_profiles"])
+        self.assertIn("security_remediator", project["agent_profiles"])
 
     def test_auto_register_discovers_project_local_agent_profiles(self) -> None:
         store = self.make_store()
@@ -101,13 +102,15 @@ class HookAutoRegistrationTest(unittest.TestCase):
     def test_security_specialist_is_identified_by_type_not_task_or_model(self) -> None:
         for agent_type, expected in (
             ("security_reviewer", "demo-security-reviewer"),
+            ("security_remediator", "demo-security-remediator"),
+            ("worker", "demo-codex-subagents"),
             ("default", "demo-codex-subagents"),
         ):
             with self.subTest(agent_type=agent_type):
                 participant_id, raw_id = hook._participant_id_for_hook(
                     {
                         "agent_id": "security-123",
-                        "task_name": "security_reviewer",
+                        "task_name": "security_remediator",
                         "model": "gpt-daybreak-blue-latest",
                     },
                     "SubagentStart",
@@ -185,6 +188,24 @@ class HookAutoRegistrationTest(unittest.TestCase):
         self.assertNotIn("model", metadata)
         self.assertNotIn("session_id", metadata)
         self.assertNotIn("turn_id", metadata)
+        self.assertNotIn("cyber_access_program", metadata)
+
+    def test_event_metadata_records_only_the_reported_access_program(self) -> None:
+        for program in ("daybreak_blue", "standard", ""):
+            with self.subTest(program=program):
+                metadata = hook._event_metadata(
+                    {"model": "gpt-daybreak-blue-latest", "cyber_access_program": program},
+                    hook_name="SubagentStart",
+                    cwd="/workspace/demo",
+                    project_slug="demo",
+                    raw_agent_id="agent-123",
+                    agent_type="security_remediator",
+                )
+
+                if program:
+                    self.assertEqual(metadata["cyber_access_program"], program)
+                else:
+                    self.assertNotIn("cyber_access_program", metadata)
 
     def test_hook_installer_adds_prompt_start_and_preserves_unrelated_hooks(self) -> None:
         existing = {

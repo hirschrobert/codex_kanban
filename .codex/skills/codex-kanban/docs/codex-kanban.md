@@ -752,6 +752,9 @@ Reusable profiles live in `.codex/agents/` in this repository, or
   review.
 - `security_reviewer`: read-only defensive security, vulnerability validation,
   and security-fix verification using Daybreak Blue when available.
+- `security_remediator`: bounded, explicitly authorized defensive fixes through
+  Codex Security `fix-finding`, pinned to Daybreak Blue with metadata-only
+  handoffs to a regular parent.
 - `project_release_manager`: read-only release and CI/CD integration review.
 - `test_strategist`: read-only test strategy, coverage, and verification
   planning.
@@ -763,9 +766,11 @@ The shipped `.codex/config.toml` supplies a `gpt-5.6-sol`/`high` subagent
 fallback and Standard speed without changing the main model. General profiles
 omit both model and reasoning effort so the main agent can explicitly select
 Terra for bounded work, Sol/xhigh for demanding review, or Astra/xhigh for an
-unresolved consequential question. Each profile explicitly sets Standard speed.
-The security specialist pins `gpt-daybreak-blue-latest`/`xhigh`; verify account
-availability before selecting it. The main agent owns escalation: an Astra
+unresolved consequential question. Each profile declares Standard speed, but
+current Codex inherits tier and permissions from the parent session; profile
+fields do not override them. Both security specialists pin
+`gpt-daybreak-blue-latest`/`xhigh`; verify account availability and authoritative
+child runtime metadata before substantive work. The main agent owns escalation: an Astra
 main agent can resolve a contributor's evidence handoff directly, or a main
 agent on another model can explicitly request a focused Astra contributor.
 
@@ -776,6 +781,30 @@ across repositories. Refresh People after installation and start a new Codex
 session to load changed custom profiles. Kanban does not enforce model routing;
 People reports actual hook-supplied runtime models for each live instantiation
 and summarizes all active models on the stable role row.
+
+Board registration/refresh does not update a running session's cached agent-type
+schema. An `unknown agent_type` error after installation requires a new/reloaded
+session for exact profile selection, or the routing guide's compatible fresh
+built-in `worker` explicitly set to Daybreak/xhigh for remediation. That worker
+stays under Codex subagents with reported type `worker`. Missing model access
+is a separate blocker; never silently assign required Daybreak fixes to the
+unpinned general implementer.
+The turn must also select `daybreak_blue`; model pins do not opt in. Check
+parent/model compatibility and the client's per-child program controls. If the
+standard parent cannot supply a valid child program, use a separate supported
+Daybreak security session with metadata-only coordination as described in the
+routing guide, and retain the direct-spawn capability blocker.
+
+Route security work before a regular parent reads findings. Use fresh child
+contexts (`fork_turns: "none"`), let verified Daybreak children read evidence
+directly from approved private artifacts, and keep automatic final responses
+and Kanban comments metadata-only: IDs, outcomes, branches/SHAs, changed paths,
+check counts/statuses, artifact paths, runtime metadata, and human decisions.
+The remediator owns `fix-finding` and its read-only investigation and single
+blind review cycle; the reviewer never writes fixes. If detailed findings
+already entered a blocked regular chat, continue in a fresh metadata-only chat
+or appropriately enabled Daybreak main chat. Kanban cannot clear retained
+context, change platform safeguards, or guarantee removal of a content block.
 
 Security review context can include confidential, untracked or Git-ignored
 repository-local policy. The reviewer discovers optional root/nested

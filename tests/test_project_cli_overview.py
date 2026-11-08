@@ -321,6 +321,8 @@ class ProjectCliOverviewTest(unittest.TestCase):
         self.assertEqual(overview["matched_project"]["slug"], "demo")
         self.assertEqual(overview["registered_project"]["root_path"], str(repo))
         self.assertEqual(overview["registration_hint"], "")
+        self.assertIn("security_remediator", overview["agent_profiles"])
+        self.assertIn("demo-security-remediator", overview["agent_participant_ids"])
 
 
 if __name__ == "__main__":
