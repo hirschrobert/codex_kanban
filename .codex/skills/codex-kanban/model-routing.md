@@ -13,10 +13,12 @@ The repository's `.codex/config.toml` sets `agents.default_subagent_model` to
 these defaults into the user's Codex configuration when installing the assets
 for use across repositories. The main model stays independently selectable.
 
-All packaged profiles set `service_tier = "default"` for Standard speed, even
-if the parent uses Fast. Keep Standard speed for built-in contributors too;
-check the effective session configuration when the spawn surface cannot select
-a tier. Do not enable Fast merely to compensate for higher reasoning effort.
+All packaged profiles declare `service_tier = "default"` as the Standard-speed
+preference. Current Codex inherits the root session's tier and permissions;
+custom-file `service_tier` and `sandbox_mode` do not override them. Set Standard
+speed and the required permissions on the parent, check the effective runtime,
+and keep read-only roles read-only by instruction. Do not enable Fast merely
+to compensate for higher reasoning effort.
 
 General profiles omit both `model` and `model_reasoning_effort` so explicit
 spawn choices can override the cheaper subagent fallback. Supply both fields
@@ -37,6 +39,7 @@ before fanning out expensive work instead of claiming the cost policy applied.
 | `project_release_manager` | `gpt-5.6-sol` | `high` |
 | `kanban_auditor` | `gpt-5.6-terra` | `medium` |
 | `security_reviewer` | `gpt-daybreak-blue-latest` (profile pin) | `xhigh` (profile pin) |
+| `security_remediator` | `gpt-daybreak-blue-latest` (profile pin) | `xhigh` (profile pin) |
 
 Use Sol/xhigh for complex implementation, cross-repository impact analysis,
 API compatibility changes, concurrency or migration test design. Use Terra/high
@@ -44,26 +47,104 @@ for a difficult board audit. Luna/medium is an option for mechanical inventory
 or extraction with explicit expected output. Higher effort consumes more tokens
 and time; increase it for a concrete need rather than for every contributor.
 
-## Security Specialist
+## Security Review And Remediation
 
-Select the exact `security_reviewer` custom type only after verifying that
-`gpt-daybreak-blue-latest` is available on the current surface. The security
-profile deliberately pins that model and xhigh effort. A spawn override cannot
-replace a custom-file pin. Do not guess a `tac1` slug or assume an alias mapping.
+Use `security_reviewer` for read-only investigation, scans, validation, or
+verification. Use `security_remediator` for explicitly authorized defensive
+fixes through the installed Codex Security `fix-finding` skill. Both pin
+`gpt-daybreak-blue-latest`/`xhigh`; a spawn override cannot replace a custom-file
+pin. Installing profiles neither grants access nor installs Codex Security.
+Do not guess a different model slug or assume an alias mapping.
 
-If Daybreak is unavailable, the main agent may carry out the security review on
-Sol or deliberately request a built-in `default` contributor on Sol/xhigh with
-the bounded security scope and read-only instructions. Report that contributor
-under the board's Codex subagents runtime role, preserve its actual type, and
-record the Daybreak fallback on the card. Do not present it as the loaded
-security specialist. If the human requires Daybreak specifically, report the
-availability blocker instead of substituting another model.
+### Route Before Reading Detailed Evidence
 
-Use the installed Codex Security skill matching the actual task: a diff scan
-for a PR/patch, a repository scan for a repository/path, or finding validation
-and fix verification for supplied evidence. Delegate repairs separately to a
-bounded implementation worker. Do not infer that installing this profile also
-installs the security skills or grants additional tools or model access.
+A regular main thread can be blocked before delegation if it already contains
+detailed security context. A Daybreak child does not change the parent's model,
+access program, or safeguards. Start routing before the main agent opens raw
+findings, private reports, proof inputs, source excerpts, or verbose logs.
+Give the child authorization/scope, card/finding IDs, repository and branch,
+policy paths, and approved artifact paths; let it read the evidence directly.
+Use `fork_turns: "none"` and a self-contained assignment for security children.
+
+Keep both automatic final-result delivery and shared Kanban comments
+metadata-only: card/finding IDs, outcome (`fixed`, `no_change`, or `blocked`
+for remediation), branch/worktree and target branch, before/after SHAs, changed
+path names, check counts/statuses, approved retained artifact paths, authoritative
+runtime model/effort/type, and required human decisions. Store the detailed
+skill report in approved private artifacts following the security skill's
+storage rules. A Daybreak remediator may read reviewer artifacts directly.
+Do not paste even a sanitized vulnerability narrative into a regular parent.
+
+If the regular thread already has detailed findings or is blocked, use a fresh
+chat with only this metadata or an appropriately enabled Daybreak main chat.
+Do not retry the same blocked content, disguise it, or claim that installing a
+role, compacting, or delegating removes retained context or relaxes safeguards.
+This workflow limits unnecessary evidence propagation; it cannot guarantee
+that a platform content restriction will disappear.
+
+### Missing Type, Missing Access, And Runtime Evidence
+
+Board discovery and runtime spawnability are separate. Startup overview can
+add a new People entry, but cannot mutate the current session's cached
+agent-type tool schema. After installing/changing profiles, start a new/reloaded
+Codex session and inspect its offered types. Treat `unknown agent_type` as a
+schema/discovery problem, distinct from Daybreak access denial.
+
+When `security_remediator` is absent from the current spawn surface, a built-in
+`worker` is the compatibility fallback only if that surface supports all of:
+
+- `fork_turns: "none"`;
+- explicit `model: "gpt-daybreak-blue-latest"` and `reasoning_effort: "xhigh"`;
+- the remediator's bounded scope, `fix-finding` workflow, runtime check, and
+  metadata-only parent contract supplied as a self-contained assignment.
+
+For example, on a compatible collaboration surface:
+
+```text
+agent_type: "worker"
+fork_turns: "none"
+model: "gpt-daybreak-blue-latest"
+reasoning_effort: "xhigh"
+message: <self-contained remediator contract and approved evidence paths>
+```
+
+Keep this worker under `<board>-codex-subagents` with actual type `worker`;
+task labels and a Daybreak model do not make it `security_remediator`. If the
+surface cannot select Daybreak or isolate context, stop with a metadata-only
+blocker and use a new supported session. Do not silently substitute Sol, Astra,
+or an unpinned `project_implementer` for required Daybreak remediation. A missing
+type does not require stopping when the compatible pinned fallback is available.
+
+Before substantive security work, verify the child's own `session_meta` agent
+path/type and latest `turn_context` model and reasoning effort, or equivalent
+authoritative Codex runtime fields. Require `gpt-daybreak-blue-latest`/`xhigh`;
+if missing or different, stop with metadata only. Inspect only the identified
+child record, never unrelated session transcripts. The orchestrator should
+cross-check this evidence; conversational self-report, task text, profile pins,
+and board registration alone do not establish the runtime. Record a reported
+alias as an alias; do not invent its resolved snapshot. If access is denied,
+report that blocker separately; do not automatically enable Daybreak or alter
+account settings.
+
+Start rollout with a fresh-session metadata-only routing probe containing no
+real findings. Confirm offered type, child path/type, model, effort, inherited
+permissions/tier, and a metadata-only final response before assigning evidence.
+
+### Remediation Workflow
+
+The remediator owns `fix-finding`: investigation, the bounded patch, ordered
+verification, and its single blind candidate-review cycle. Use fresh
+`security_reviewer` children on verified Daybreak for the read-only investigator
+and candidate reviewer. A fresh built-in `default` explicitly pinned to Daybreak
+and instructed read-only is acceptable when the exact reviewer type is absent.
+If delegation is unavailable, follow the skill's separate-pass alternative.
+Do not let the read-only reviewer write patches. Give the blind reviewer only
+the finding, repository root, authorized scope, policy, and candidate diff,
+without implementation rationale, investigator results, or test-success claims.
+Respect workbench stage boundaries and retain detailed reports privately.
+If `fix-finding` is missing, return a blocker; do not improvise a general-model
+repair. Use the other installed Codex Security skills matching scan, validation,
+or verification requests without treating their availability as model access.
 
 ### Local And Confidential Security Context
 
@@ -123,10 +204,12 @@ it before spending more on another model.
   role, select the exact role and supply both model and effort. Respect fork
   restrictions on the active spawn surface; if overrides require a fresh or
   partial context, supply a self-contained evidence handoff.
-- For a second security opinion, an Astra main agent reviews the handoff, or
+- For ordinary second opinions, an Astra main agent reviews the handoff, or
   the main agent explicitly selects an unpinned `project_reviewer` or built-in
   contributor on Astra. Keep the original Daybreak specialist's identity and
   result separate; its pinned model cannot be upgraded through spawn arguments.
+  Detailed Daybreak security evidence stays in verified Daybreak threads/private
+  artifacts; use metadata-only decision requests for a regular Astra parent.
 - If model selection is unavailable, report the limitation and the next
   required action. Do not claim that requesting Astra in task text changed the
   runtime model, silently inherit an expensive parent, or loop repeated reviews.
@@ -141,16 +224,19 @@ cheaper model. A subagent cannot change the model of its parent.
 Codex resolves model/effort from explicit spawn arguments, then `[agents]`
 defaults, then the parent. Values in a custom agent file take precedence over
 those resolved values. That is why general profiles leave both fields open and
-the Daybreak specialist has an explicit fallback workflow.
+the Daybreak specialists have an explicit fallback workflow.
 
 People displays hook-reported runtime models, not this recommendation table.
 Do not infer actual effort, service tier, token cost, or a resolved versioned
 snapshot from the role name or a moving model alias. Record those details from
 runtime evidence when available and required for release disclosure.
 
-Verified against Codex CLI 0.153.4 and official documentation on 2026-09-07:
+Security routing and configuration precedence checked against Codex CLI 0.157.1
+and official documentation on 2026-11-08. The session-schema reload requirement
+also reflects the observed installed-profile rollout; Kanban cannot refresh it.
 
 - [Subagent configuration and precedence](https://learn.chatgpt.com/docs/agent-configuration/subagents)
 - [Models and reasoning effort](https://learn.chatgpt.com/docs/models)
 - [Standard and Fast speed](https://learn.chatgpt.com/docs/agent-configuration/speed)
 - [Daybreak Blue](https://developers.openai.com/api/docs/models/gpt-daybreak-blue-latest)
+- [Check Daybreak access in Codex](https://learn.chatgpt.com/use-cases/getting-started-with-daybreak-blue#check-access-in-codex)

@@ -27,6 +27,12 @@ updates, verification, and rollback, use the bundled
 
 ## First Move
 
+For security work under a regular-model main chat, read the security section of
+[model-routing.md](model-routing.md) before opening findings, detailed reports,
+or security source evidence. Route that context directly to fresh Daybreak
+children; keep the parent and shared cards to metadata-only handoffs. Access to
+Daybreak on a child does not change the main thread's model or safeguards.
+
 1. Read the current repo `AGENTS.md`, then nearest nested `AGENTS.md`.
 2. Find or register the project board. First use registered projects/current
    cwd matching; ecosystems match any registered app, repo, or worktree path.
@@ -196,6 +202,7 @@ Use board-scoped participants for Kanban state:
 - `<board>-project-implementer`
 - `<board>-project-reviewer`
 - `<board>-security-reviewer`
+- `<board>-security-remediator`
 - `<board>-project-release-manager`
 - other registered project-local profiles.
 
@@ -219,13 +226,19 @@ select the model and effort for the task. The shipped Codex configuration uses
 Request Terra for bounded implementation, impact mapping and board audits;
 request Sol/xhigh for demanding architecture, review and domain-model work.
 Use Standard speed. General profiles leave model and effort unpinned so explicit
-spawn choices remain possible; every profile sets `service_tier = "default"`.
+spawn choices remain possible. Every profile declares `service_tier = "default"`,
+but current Codex inherits the parent's tier and permissions; check the effective
+session settings instead of treating profile fields as enforcement.
 
-The `security_reviewer` specialist pins `gpt-daybreak-blue-latest`/`xhigh`.
-Check availability before selecting it and use the routing guide's explicit
-Sol fallback if necessary. A custom-file pin takes precedence over spawn
-arguments. Installing a profile does not grant model access or install the
-Codex Security skills.
+The read-only `security_reviewer` and write-capable `security_remediator` pin
+`gpt-daybreak-blue-latest`/`xhigh`. Use `fix-finding` for explicitly authorized
+remediation. Check authoritative runtime metadata before substantive work;
+custom-file pins win over spawn arguments. Installing profiles does not grant
+access, install Codex Security skills, or update a session's cached agent-type
+schema. Start a new/reloaded session to expose newly installed types. A board
+refresh updates People only. If the type is missing, use the routing guide's
+fresh, explicitly Daybreak-pinned built-in fallback when supported; never
+silently send remediation to an unpinned implementer.
 
 Security context may live in untracked or Git-ignored repository-local files.
 Discover optional `SECURITY.md` policies from the filesystem and read explicitly

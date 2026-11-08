@@ -14,6 +14,7 @@ class PublicEntrypointTest(unittest.TestCase):
         self.assertIs(project_main, project.main)
         self.assertEqual(DEFAULT_DB_PATH.name, "kanban.sqlite3")
         self.assertIn("project_implementer", GENERIC_AGENT_PROFILES)
+        self.assertIn("security_remediator", GENERIC_AGENT_PROFILES)
         self.assertTrue(callable(KanbanStore))
 
     def test_project_package_module_help_runs(self) -> None:

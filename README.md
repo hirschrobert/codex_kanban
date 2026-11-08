@@ -20,6 +20,14 @@ ships reusable Codex skill and agent definitions under `.codex/`.
 - Generic agent profiles for implementation, review, security, release, audit,
   architecture, API contracts, domain models, and test strategy, with cheaper
   GPT-5.6 subagent defaults, Standard speed, and deliberate Astra escalation.
+- Separate Daybreak-pinned `security_reviewer` (read-only) and
+  `security_remediator` (bounded fixes through Codex Security `fix-finding`)
+  roles, with fresh child contexts and metadata-only parent handoffs.
+
+After installing profiles, start a new/reloaded Codex session; refreshing board
+People entries does not refresh the current session's spawnable agent types.
+See the [model routing guide](.codex/skills/codex-kanban/model-routing.md) for
+Daybreak runtime checks and the explicitly pinned built-in worker fallback.
 
 ## Quick Start
 

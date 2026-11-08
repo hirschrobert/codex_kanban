@@ -128,27 +128,51 @@ class AgentRuntimeSnapshotTest(unittest.TestCase):
 
     def test_security_role_reports_observed_model_without_inventing_a_snapshot(self) -> None:
         store = self.make_store()
-        for model in ("gpt-daybreak-blue-latest", "gpt-5.6-sol", ""):
-            with self.subTest(reported_model=model):
-                store.create_event(
-                    {
-                        "board_slug": "demo",
-                        "event_type": "subagent.started",
-                        "participant_id": "demo-security-reviewer",
-                        "metadata": {
-                            "raw_agent_id": "security-1",
-                            "agent_type": "security_reviewer",
-                            "model": model,
-                        },
-                    }
-                )
-                role = next(
-                    item
-                    for item in store.snapshot("demo")["participants"]
-                    if item["id"] == "demo-security-reviewer"
-                )
-                self.assertEqual(role["instances"][0]["model"], model)
-                self.assertEqual(role["active_models"], [model] if model else [])
+        for agent_type in ("security_reviewer", "security_remediator"):
+            participant_id = f"demo-{agent_type.replace('_', '-')}"
+            for model in ("gpt-daybreak-blue-latest", "gpt-5.6-sol", ""):
+                with self.subTest(agent_type=agent_type, reported_model=model):
+                    store.create_event(
+                        {
+                            "board_slug": "demo",
+                            "event_type": "subagent.started",
+                            "participant_id": participant_id,
+                            "metadata": {
+                                "raw_agent_id": f"{agent_type}-1",
+                                "agent_type": agent_type,
+                                "model": model,
+                            },
+                        }
+                    )
+                    role = next(
+                        item
+                        for item in store.snapshot("demo")["participants"]
+                        if item["id"] == participant_id
+                    )
+                    self.assertEqual(role["instances"][0]["model"], model)
+                    self.assertEqual(role["active_models"], [model] if model else [])
+
+    def test_daybreak_worker_remains_a_native_runtime_instance(self) -> None:
+        store = self.make_store()
+        store.create_event(
+            {
+                "board_slug": "demo",
+                "event_type": "subagent.started",
+                "participant_id": "demo-codex-subagents",
+                "metadata": {
+                    "raw_agent_id": "daybreak-worker-1",
+                    "agent_type": "worker",
+                    "task_name": "security_remediator",
+                    "model": "gpt-daybreak-blue-latest",
+                },
+            }
+        )
+        roles = {item["id"]: item for item in store.snapshot("demo")["participants"]}
+
+        instance = roles["demo-codex-subagents"]["instances"][0]
+        self.assertEqual(instance["agent_type"], "worker")
+        self.assertEqual(instance["model"], "gpt-daybreak-blue-latest")
+        self.assertEqual(roles["demo-security-remediator"]["instances"], [])
 
     def test_finished_and_stale_instances_disappear_but_role_remains(self) -> None:
         store = self.make_store()

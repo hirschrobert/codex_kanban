@@ -45,6 +45,7 @@ class HookAutoRegistrationTest(unittest.TestCase):
         self.assertEqual(matched["slug"], "new-project")
         self.assertIn("domain_model_steward", project["agent_profiles"])
         self.assertIn("api_contract_steward", project["agent_profiles"])
+        self.assertIn("security_remediator", project["agent_profiles"])
 
     def test_auto_register_discovers_project_local_agent_profiles(self) -> None:
         store = self.make_store()
@@ -101,13 +102,15 @@ class HookAutoRegistrationTest(unittest.TestCase):
     def test_security_specialist_is_identified_by_type_not_task_or_model(self) -> None:
         for agent_type, expected in (
             ("security_reviewer", "demo-security-reviewer"),
+            ("security_remediator", "demo-security-remediator"),
+            ("worker", "demo-codex-subagents"),
             ("default", "demo-codex-subagents"),
         ):
             with self.subTest(agent_type=agent_type):
                 participant_id, raw_id = hook._participant_id_for_hook(
                     {
                         "agent_id": "security-123",
-                        "task_name": "security_reviewer",
+                        "task_name": "security_remediator",
                         "model": "gpt-daybreak-blue-latest",
                     },
                     "SubagentStart",

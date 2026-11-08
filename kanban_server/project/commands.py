@@ -413,9 +413,15 @@ justification for skipping it. When a registered profile is deliberately chosen,
 select its exact custom-agent type so Codex loads the matching configuration;
 native or otherwise unregistered agents remain visible under the board-scoped
 Codex subagents People role with their reported runtime type.
+Board registration does not change the current session's agent-type schema.
+Start a new/reloaded Codex session after installing profiles. For security work,
+read the skill's model-routing.md before opening findings: use fresh Daybreak
+children and metadata-only parent handoffs.
 When delegated work produces findings, decisions, blockers, or completion
 results, add a concise card comment to the parent coordination card so the
 topic context stays with the parent card, not only with a child card or chat.
+Security comments contain only metadata; retain detailed evidence in approved
+private artifacts accessible to the security child.
 
 For first overview, run:
 

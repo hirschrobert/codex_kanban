@@ -27,7 +27,11 @@ class AgentProfileContractTest(unittest.TestCase):
             with self.subTest(role=name):
                 self.assertTrue(profile["description"].strip())
                 self.assertTrue(profile["developer_instructions"].strip())
-                expected = "workspace-write" if name == "project_implementer" else "read-only"
+                expected = (
+                    "workspace-write"
+                    if name in {"project_implementer", "security_remediator"}
+                    else "read-only"
+                )
                 self.assertEqual(profile["sandbox_mode"], expected)
 
     def test_subagent_defaults_control_cost_without_changing_the_main_model(self) -> None:
@@ -40,7 +44,7 @@ class AgentProfileContractTest(unittest.TestCase):
 
     def test_general_roles_allow_explicit_model_and_effort_escalation(self) -> None:
         for name, profile in self.profiles.items():
-            if name == "security_reviewer":
+            if name in {"security_reviewer", "security_remediator"}:
                 continue
             with self.subTest(role=name):
                 # A custom-file pin wins over spawn arguments in Codex. Both must
@@ -48,15 +52,17 @@ class AgentProfileContractTest(unittest.TestCase):
                 self.assertNotIn("model", profile)
                 self.assertNotIn("model_reasoning_effort", profile)
 
-    def test_all_roles_override_an_inherited_fast_tier(self) -> None:
+    def test_all_roles_declare_the_standard_tier_preference(self) -> None:
         for name, profile in self.profiles.items():
             with self.subTest(role=name):
                 self.assertEqual(profile["service_tier"], "default")
 
-    def test_security_specialist_pins_the_verified_defensive_model(self) -> None:
-        profile = self.profiles["security_reviewer"]
-        self.assertEqual(profile["model"], "gpt-daybreak-blue-latest")
-        self.assertEqual(profile["model_reasoning_effort"], "xhigh")
+    def test_security_specialists_pin_the_verified_defensive_model(self) -> None:
+        for name in ("security_reviewer", "security_remediator"):
+            with self.subTest(role=name):
+                profile = self.profiles[name]
+                self.assertEqual(profile["model"], "gpt-daybreak-blue-latest")
+                self.assertEqual(profile["model_reasoning_effort"], "xhigh")
 
     def test_routing_guide_covers_every_packaged_role(self) -> None:
         guide = (SKILL / "model-routing.md").read_text(encoding="utf-8")

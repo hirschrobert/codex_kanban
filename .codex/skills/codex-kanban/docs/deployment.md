@@ -99,6 +99,10 @@ PYTHONPATH="$KANBAN_REPO" python3 -m kanban_server.hook install \
 Review and trust the hook when Codex asks. Start a new Codex session after
 skill, profile, configuration, or hook changes; an existing session does not
 reload all of those assets dynamically.
+Board discovery only updates People entries; it does not refresh the current
+session's cached custom-agent tool schema. In particular, seeing
+`security_remediator` on a board is not proof that the current session can spawn
+it. Distinguish `unknown agent_type` from denied Daybreak access.
 
 ## Verification
 
@@ -122,6 +126,23 @@ python3 "$KANBAN_REPO/scripts/install_codex_assets.py" --dry-run
 If `CODEX_HOME` is set, substitute that directory for `$HOME/.codex` in manual
 checks. Finally, run the startup overview from a new Codex session and confirm
 the expected project and board-scoped People entries appear.
+
+For security routing, first run a metadata-only probe in that new session,
+without real findings. Confirm the exact `security_remediator` type is offered
+and spawn it with a fresh context (`fork_turns: "none"`). Cross-check its
+`session_meta` agent path/type and latest `turn_context` model/effort (or
+equivalent Codex runtime fields) for `gpt-daybreak-blue-latest`/`xhigh`; do not
+use conversational model self-identification as evidence. Confirm effective
+inherited permissions/tier and a metadata-only final response. Keep reports
+private and return only their approved artifact paths to a regular parent.
+
+If an older session lacks the custom type, use the
+[model routing guide](../model-routing.md)'s fresh built-in `worker` explicitly
+pinned to Daybreak/xhigh with the full remediator contract, when supported.
+Otherwise report the missing capability and use a new supported session. The
+installer neither enables Daybreak nor installs Codex Security; remediation
+requires the installed `fix-finding` workflow. Account access and profile
+discovery are separate from runtime verification.
 
 ## Updating
 
