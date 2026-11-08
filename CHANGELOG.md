@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.1.19 - 2026-11-08
+
+This release refreshes the development and build toolchain, including the
+patched Black release and the latest stable locked dependencies.
+
+Public commits:
+
+- `5ff6a81` updates Black to 26.10.1 and raises its minimum to the patched
+  version for CK-2880.
+- `8acefe6` refreshes Pyright, Ruff, the setuptools build minimum, and the
+  transitive dependency lock for CK-2881.
+- `ea8434a` merges the human-approved toolchain updates into `release/0.1.19`.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and package versions
+and the final release merge commit are not self-referenced.
+
+Changes:
+
+- Updated Black to 26.10.1 and raised its minimum version to the patched
+  release for the tracked development-tool advisory.
+- Refreshed Pyright to 1.1.414, Ruff to 0.17.4, the setuptools build minimum to
+  84.2.1, and the locked transitive dependencies to their latest stable versions.
+- Removed the obsolete Colorama lock entry. The synchronized toolchain passes
+  formatting, lint, type, test, and wheel/source-distribution checks without
+  requiring Python source-formatting changes.
+
+AI disclosure:
+
+The main AI Agent Manager implemented, reviewed, integrated, audited, and
+prepared this release using `gpt-6.1-sol` (GPT-6.1 Sol), with `xhigh` reasoning,
+verified from the session's runtime records. No delegated agents were used for
+this release. Coordination used the running Codex Kanban checkout `fb7e45b`
+(version 0.1.18), verified from the live dashboard metadata and Git evidence.
+
 ## 0.1.18 - 2026-11-08
 
 This release adds a Daybreak remediation role and isolated security handoffs,
