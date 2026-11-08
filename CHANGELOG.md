@@ -1,6 +1,25 @@
 # Changelog
 
-## Unreleased - target 0.1.18
+## 0.1.18 - 2026-11-08
+
+This release adds a Daybreak remediation role and isolated security handoffs,
+with verified routing guidance for clients that cannot select a child's cyber
+access program separately from its parent.
+
+Public commits:
+
+- `f5b572d` adds the managed security remediator, fresh-context routing,
+  metadata-only handoffs, and installer, registration, and runtime coverage.
+- `ce9a977` adds explicit Blue turn-program checks, compatible-session routing,
+  and reported access-program metadata without inferring access from a model.
+- `667a95e` merges the human-approved CK-2869 changes into `release/0.1.18`.
+
+Release metadata note:
+
+The release metadata commit that updates this changelog and package versions
+and the final release merge commit are not self-referenced.
+
+Changes:
 
 - Added a managed `security_remediator` pinned to Daybreak Blue/xhigh for
   bounded defensive fixes through Codex Security `fix-finding`; retained the
@@ -15,6 +34,26 @@
   the required child access program.
 - Extended installer, registration, hook mapping, and runtime reporting checks
   for both security roles and the generic worker fallback.
+
+AI disclosure:
+
+The main AI Agent Manager implemented, reviewed, integrated, audited, and
+prepared this release using `gpt-6.1-sol` (GPT-6.1 Sol), with `xhigh` reasoning,
+verified from the session's runtime records. Delegation was limited to
+metadata-only routing verification. Probe orchestrators used `gpt-6.1-sol`
+(GPT-6.1 Sol) and `gpt-6-sol` (GPT-6 Sol), both with `low` reasoning.
+
+The metadata-only `security_remediator` probe ran as
+`gpt-daybreak-blue-latest` (Daybreak Blue), `xhigh`, with the `daybreak_blue`
+access program. Its runtime record exposed the alias but no resolved versioned
+snapshot. The human explicitly approved this exact-alias disclosure exception
+for the probe; no resolved snapshot is inferred. Denied startup probes did not
+perform a security assessment, and no real findings were supplied to the probes.
+
+Initial coordination used the running Codex Kanban checkout `97f0867`.
+Managed coordination assets were installed from `f5b572d` during rollout and
+then from `ce9a977`, verified against source and retained backups. Release
+preparation used installed assets matching `ce9a977` from checkout `667a95e`.
 
 ## 0.1.17 - 2026-09-12
 
