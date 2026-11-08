@@ -99,6 +99,9 @@ GENERIC_AGENT_PROFILES = {
     "security_reviewer": (
         "Read-only defensive security, vulnerability validation, and security-fix verification."
     ),
+    "security_remediator": (
+        "Bounded defensive vulnerability remediation using Daybreak Blue and fix-finding."
+    ),
     "project_release_manager": "Read-only release, CI/CD, packaging, and deploy-readiness review.",
     "test_strategist": "Read-only test strategy, coverage, and verification planning.",
 }

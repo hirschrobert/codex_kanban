@@ -140,7 +140,8 @@ def main() -> int:
     if backup_root.exists():
         print(f"Backed up replaced assets: {backup_root}")
     print(f"User configuration was not changed; review defaults in: {SOURCE_CONFIG}")
-    print("Start a new Codex session, then run the Kanban startup overview.")
+    print("Start a new/reloaded Codex session, then run the Kanban startup overview.")
+    print("Board discovery does not refresh this session's spawnable custom-agent types.")
     return 0
 
 
