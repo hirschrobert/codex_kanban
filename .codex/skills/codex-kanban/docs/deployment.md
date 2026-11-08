@@ -143,6 +143,11 @@ Otherwise report the missing capability and use a new supported session. The
 installer neither enables Daybreak nor installs Codex Security; remediation
 requires the installed `fix-finding` workflow. Account access and profile
 discovery are separate from runtime verification.
+Also verify the child turn's `cyber_access_program=daybreak_blue`. A model pin
+alone does not select the program. Use the current model catalog and a client
+that can request the program for the child. If it inherits an incompatible
+parent selection, use the routing guide's separate supported Daybreak session;
+installing profiles or retrying the same standard parent cannot fix that.
 
 ## Updating
 

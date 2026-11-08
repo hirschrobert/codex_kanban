@@ -27,7 +27,10 @@ ships reusable Codex skill and agent definitions under `.codex/`.
 After installing profiles, start a new/reloaded Codex session; refreshing board
 People entries does not refresh the current session's spawnable agent types.
 See the [model routing guide](.codex/skills/codex-kanban/model-routing.md) for
-Daybreak runtime checks and the explicitly pinned built-in worker fallback.
+Daybreak runtime/program checks, the explicitly pinned built-in worker fallback,
+and the separate security-session route when the client cannot select Blue for
+a child of a standard parent. Model access, turn opt-in, and profile discovery
+are separate requirements.
 
 ## Quick Start
 

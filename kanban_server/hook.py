@@ -267,6 +267,7 @@ def _event_metadata(
     }
     runtime_fields = {
         "model": _first_text(payload.get("model")),
+        "cyber_access_program": _first_text(payload.get("cyber_access_program")),
         "session_id": _first_text(payload.get("session_id"), payload.get("sessionId")),
         "turn_id": _first_text(payload.get("turn_id"), payload.get("turnId")),
         "status": _status_for_hook(hook_name),
@@ -336,7 +337,7 @@ def _context_message(project: dict[str, Any], board_slug: str) -> str:
         "start a new/reloaded Codex session after installing profiles. "
         "For security review or remediation, read the skill's model-routing.md "
         "before opening findings: use fresh Daybreak children and metadata-only "
-        "parent handoffs. "
+        "parent handoffs, and verify the child's daybreak_blue turn opt-in. "
         "When delegated work finishes, add a concise result comment to the "
         "parent coordination card so findings, decisions, blockers, and next "
         "steps stay with the topic context; security comments contain only metadata. "

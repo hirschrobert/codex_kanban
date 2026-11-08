@@ -10,6 +10,9 @@
   pinned built-in worker fallback when the custom type is unavailable.
 - Distinguished board People refresh from session agent-type reload and model
   access, and corrected guidance on inherited permissions and service tier.
+- Added explicit Blue turn-program and parent/model compatibility checks;
+  documented a separate supported security session for clients unable to select
+  the required child access program.
 - Extended installer, registration, hook mapping, and runtime reporting checks
   for both security roles and the generic worker fallback.
 

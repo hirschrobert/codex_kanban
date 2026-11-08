@@ -239,6 +239,10 @@ schema. Start a new/reloaded session to expose newly installed types. A board
 refresh updates People only. If the type is missing, use the routing guide's
 fresh, explicitly Daybreak-pinned built-in fallback when supported; never
 silently send remediation to an unpinned implementer.
+Model pins do not select the turn's cyber access program. Check the effective
+`daybreak_blue` opt-in and parent/model compatibility; when the client lacks
+per-child program selection, use the routing guide's separate supported
+Daybreak session and retain the direct mixed-session capability blocker.
 
 Security context may live in untracked or Git-ignored repository-local files.
 Discover optional `SECURITY.md` policies from the filesystem and read explicitly

@@ -70,7 +70,7 @@ Keep both automatic final-result delivery and shared Kanban comments
 metadata-only: card/finding IDs, outcome (`fixed`, `no_change`, or `blocked`
 for remediation), branch/worktree and target branch, before/after SHAs, changed
 path names, check counts/statuses, approved retained artifact paths, authoritative
-runtime model/effort/type, and required human decisions. Store the detailed
+runtime model/effort/type/access program, and required human decisions. Store the detailed
 skill report in approved private artifacts following the security skill's
 storage rules. A Daybreak remediator may read reviewer artifacts directly.
 Do not paste even a sanitized vulnerability narrative into a regular parent.
@@ -90,11 +90,48 @@ agent-type tool schema. After installing/changing profiles, start a new/reloaded
 Codex session and inspect its offered types. Treat `unknown agent_type` as a
 schema/discovery problem, distinct from Daybreak access denial.
 
+Model access and request opt-in are also separate. The Daybreak alias can
+reject a request unless `access_programs.cyber=daybreak_blue` is selected for
+the actual turn. A custom-agent model pin does not select that access program.
+Use the client's supported Daybreak control (for example `/daybreak` or the
+model-menu toggle), or `codex exec --cyber-access-program daybreak_blue` on a
+compatible CLI. This uses existing approved access; do not change account
+provisioning or silently enable a program for unrelated work.
+
+Check the current model catalog's `available_access_programs` before selecting
+the parent/model combination. In the 2026-11-08 routing probe, a standard
+`gpt-6.1-sol` parent exposed the exact custom role, but its Daybreak child failed
+with a missing-program error. Opting that parent into Blue was also rejected
+because Blue was unavailable for that parent model on the tested account.
+The active spawn surface offered no per-child program selector. Restarting or
+using a built-in worker alone cannot repair that combination.
+
+When per-child program selection is unavailable, keep the regular chat as a
+metadata-only coordinator and use a separate supported Daybreak security
+session. For Blue-approved access, `gpt-6-sol` with the Blue turn opt-in is a
+candidate only when the current catalog offers that combination. For example:
+
+```bash
+codex exec --model gpt-6-sol --cyber-access-program daybreak_blue \
+  --sandbox workspace-write - < metadata-only-security-assignment.txt
+```
+
+That assignment should request fresh exact security-role children and the
+metadata-only contract; it must not include raw findings. Verify the child
+runtime before assigning evidence. The compatible 2026-11-08 probe verified
+`security_remediator` on `gpt-daybreak-blue-latest`/`xhigh`/`daybreak_blue` and a
+metadata-only response. This is a separate security session, not
+proof that a standard `gpt-6.1-sol` parent can directly spawn a Blue child.
+Keep the original incompatibility as a client capability blocker until that
+surface supports the required child program selection. For model/program
+semantics, see [Daybreak request selection](https://developers.openai.com/api/docs/guides/daybreak).
+
 When `security_remediator` is absent from the current spawn surface, a built-in
 `worker` is the compatibility fallback only if that surface supports all of:
 
 - `fork_turns: "none"`;
 - explicit `model: "gpt-daybreak-blue-latest"` and `reasoning_effort: "xhigh"`;
+- an effective `daybreak_blue` access program for the child turn;
 - the remediator's bounded scope, `fix-finding` workflow, runtime check, and
   metadata-only parent contract supplied as a self-contained assignment.
 
@@ -116,8 +153,9 @@ or an unpinned `project_implementer` for required Daybreak remediation. A missin
 type does not require stopping when the compatible pinned fallback is available.
 
 Before substantive security work, verify the child's own `session_meta` agent
-path/type and latest `turn_context` model and reasoning effort, or equivalent
-authoritative Codex runtime fields. Require `gpt-daybreak-blue-latest`/`xhigh`;
+path/type and latest `turn_context` model, reasoning effort, and
+`cyber_access_program`, or equivalent authoritative Codex runtime fields.
+Require `gpt-daybreak-blue-latest`/`xhigh` and `daybreak_blue`;
 if missing or different, stop with metadata only. Inspect only the identified
 child record, never unrelated session transcripts. The orchestrator should
 cross-check this evidence; conversational self-report, task text, profile pins,
@@ -127,7 +165,7 @@ report that blocker separately; do not automatically enable Daybreak or alter
 account settings.
 
 Start rollout with a fresh-session metadata-only routing probe containing no
-real findings. Confirm offered type, child path/type, model, effort, inherited
+real findings. Confirm offered type, child path/type, model, effort, access program, inherited
 permissions/tier, and a metadata-only final response before assigning evidence.
 
 ### Remediation Workflow
@@ -231,8 +269,10 @@ Do not infer actual effort, service tier, token cost, or a resolved versioned
 snapshot from the role name or a moving model alias. Record those details from
 runtime evidence when available and required for release disclosure.
 
-Security routing and configuration precedence checked against Codex CLI 0.157.1
-and official documentation on 2026-11-08. The session-schema reload requirement
+Security routing and configuration precedence checked against the IDE-bundled
+Codex CLI 0.164.0-alpha.11.1 and official documentation on 2026-11-08. The older
+standalone CLI 0.157.1 rejected `gpt-6.1-sol` before delegation in this rollout;
+use a client that supports the selected model/program. The session-schema reload requirement
 also reflects the observed installed-profile rollout; Kanban cannot refresh it.
 
 - [Subagent configuration and precedence](https://learn.chatgpt.com/docs/agent-configuration/subagents)

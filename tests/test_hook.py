@@ -188,6 +188,24 @@ class HookAutoRegistrationTest(unittest.TestCase):
         self.assertNotIn("model", metadata)
         self.assertNotIn("session_id", metadata)
         self.assertNotIn("turn_id", metadata)
+        self.assertNotIn("cyber_access_program", metadata)
+
+    def test_event_metadata_records_only_the_reported_access_program(self) -> None:
+        for program in ("daybreak_blue", "standard", ""):
+            with self.subTest(program=program):
+                metadata = hook._event_metadata(
+                    {"model": "gpt-daybreak-blue-latest", "cyber_access_program": program},
+                    hook_name="SubagentStart",
+                    cwd="/workspace/demo",
+                    project_slug="demo",
+                    raw_agent_id="agent-123",
+                    agent_type="security_remediator",
+                )
+
+                if program:
+                    self.assertEqual(metadata["cyber_access_program"], program)
+                else:
+                    self.assertNotIn("cyber_access_program", metadata)
 
     def test_hook_installer_adds_prompt_start_and_preserves_unrelated_hooks(self) -> None:
         existing = {

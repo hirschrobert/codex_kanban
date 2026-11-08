@@ -789,6 +789,11 @@ built-in `worker` explicitly set to Daybreak/xhigh for remediation. That worker
 stays under Codex subagents with reported type `worker`. Missing model access
 is a separate blocker; never silently assign required Daybreak fixes to the
 unpinned general implementer.
+The turn must also select `daybreak_blue`; model pins do not opt in. Check
+parent/model compatibility and the client's per-child program controls. If the
+standard parent cannot supply a valid child program, use a separate supported
+Daybreak security session with metadata-only coordination as described in the
+routing guide, and retain the direct-spawn capability blocker.
 
 Route security work before a regular parent reads findings. Use fresh child
 contexts (`fork_turns: "none"`), let verified Daybreak children read evidence
